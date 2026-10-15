@@ -1,6 +1,6 @@
 import { getAllPrices } from "../services/priceService";
-import { matchesPriceType } from "../utils/priceHelpers";
-
+// import { matchesPriceType } from "../utils/priceHelpers";
+import useProductFilters from "../hooks/useProductFilters";
 import { useEffect, useMemo, useState } from "react";
 
 import Sidebar from "../components/Sidebar";
@@ -131,67 +131,34 @@ export default function Dashboard() {
     );
 
     // Preserve existing product search and catalogue filters.
-    const filteredProducts = useMemo(() => {
-        const term = search.trim().toLowerCase();
-
-        const pricesByProduct = allPrices.reduce((map, price) => {
-            const id = price.product_id;
-            if (!id) return map;
-
-            if (!map.has(id)) map.set(id, []);
-            map.get(id).push(price);
-
-            return map;
-        }, new Map());
-
-        return products.filter((product) => {
-            const searchableText = [
-                product.product_id,
-                product.product_name,
-                product.model,
-                product.brand_id,
-                product.category_id,
-            ]
-                .filter(Boolean)
-                .join(" ")
-                .toLowerCase();
-
-            const matchesSearch = searchableText.includes(term);
-
-            const matchesBrand =
-                brand === DEFAULT_BRAND ||
-                String(product.brand_id ?? "").toLowerCase() === brand.toLowerCase();
-
-            const matchesCategory =
-                category === DEFAULT_CATEGORY ||
-                String(product.category_id ?? "").toLowerCase() ===
-                category.toLowerCase();
-
-            const productPrices = pricesByProduct.get(product.product_id) ?? [];
-            const matchesType = matchesPriceType(productPrices, priceType);
-
-            return matchesSearch && matchesBrand && matchesCategory && matchesType;
-        });
-    }, [products, search, brand, category, priceType, allPrices]);
+    const filteredProducts = useProductFilters({
+        products,
+        search,
+        brand,
+        category,
+        priceType,
+        allPrices,
+    });
 
     const totalProducts = filteredProducts.length;
     const totalPages = Math.max(1, Math.ceil(totalProducts / pageSize));
+    const visiblePage = Math.min(currentPage, totalPages);
 
     const paginatedProducts = useMemo(() => {
-        const startIndex = (currentPage - 1) * pageSize;
+        const startIndex = (visiblePage - 1) * pageSize;
 
         return filteredProducts.slice(startIndex, startIndex + pageSize);
-    }, [filteredProducts, currentPage, pageSize]);
+    }, [filteredProducts, visiblePage, pageSize]);
 
     const startRecord =
-        totalProducts === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+        totalProducts === 0 ? 0 : (visiblePage - 1) * pageSize + 1;
 
-    const endRecord = Math.min(currentPage * pageSize, totalProducts);
+    const endRecord = Math.min(visiblePage * pageSize, totalProducts);
 
     const pageNumbers = useMemo(() => {
         const maxVisiblePages = 5;
 
-        let start = Math.max(1, currentPage - 2);
+        let start = Math.max(1, visiblePage - 2);
         let end = Math.min(totalPages, start + maxVisiblePages - 1);
 
         start = Math.max(1, end - maxVisiblePages + 1);
@@ -200,17 +167,7 @@ export default function Dashboard() {
             { length: end - start + 1 },
             (_, index) => start + index
         );
-    }, [currentPage, totalPages]);
-
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [search, brand, category, priceType, pageSize]);
-
-    useEffect(() => {
-        if (currentPage > totalPages) {
-            setCurrentPage(totalPages);
-        }
-    }, [currentPage, totalPages]);
+    }, [visiblePage, totalPages]);
 
     // Fetch pricing only for the products shown on the current page.
     useEffect(() => {
@@ -308,9 +265,6 @@ export default function Dashboard() {
     // Fetch selected-product prices independently of the current page.
     useEffect(() => {
         if (!selectedProductId) {
-            setSelectedPrices([]);
-            setSelectedPricesError("");
-            setSelectedPricesLoading(false);
             return;
         }
 
@@ -351,6 +305,11 @@ export default function Dashboard() {
         setCurrentPage(Math.min(Math.max(page, 1), totalPages));
     }
 
+    function handleSearch(value) {
+        setCurrentPage(1);
+        setSearch(value);
+    }
+
     function clearFilters() {
         setSearch("");
         setBrand(DEFAULT_BRAND);
@@ -371,7 +330,7 @@ export default function Dashboard() {
             <Sidebar activePage={activePage} onNavigate={setActivePage} />
 
             <div className="main-area">
-                <Topbar search={search} onSearch={setSearch} />
+                <Topbar search={search} onSearch={handleSearch} />
 
                 <main className="page-content">
                     <div className="page-heading">
@@ -457,7 +416,10 @@ export default function Dashboard() {
                                 <span>Brand</span>
                                 <select
                                     value={brand}
-                                    onChange={(event) => setBrand(event.target.value)}
+                                    onChange={(event) => {
+                                        setCurrentPage(1);
+                                        setBrand(event.target.value);
+                                    }}
                                 >
                                     <option value={DEFAULT_BRAND}>All Brands</option>
                                     {brands.map((item) => (
@@ -472,7 +434,10 @@ export default function Dashboard() {
                                 <span>Category</span>
                                 <select
                                     value={category}
-                                    onChange={(event) => setCategory(event.target.value)}
+                                    onChange={(event) => {
+                                        setCurrentPage(1);
+                                        setCategory(event.target.value);
+                                    }}
                                 >
                                     <option value={DEFAULT_CATEGORY}>All Categories</option>
                                     {categories.map((item) => (
@@ -487,7 +452,10 @@ export default function Dashboard() {
                                 <span>Price Type</span>
                                 <select
                                     value={priceType}
-                                    onChange={(event) => setPriceType(event.target.value)}
+                                    onChange={(event) => {
+                                        setCurrentPage(1);
+                                        setPriceType(event.target.value);
+                                    }}
                                 >
                                     <option value={DEFAULT_PRICE_TYPE}>All Price Types</option>
                                     <option value="MRP">MRP</option>
@@ -637,9 +605,10 @@ export default function Dashboard() {
                                     <select
                                         aria-label="Rows per page"
                                         value={pageSize}
-                                        onChange={(event) =>
-                                            setPageSize(Number(event.target.value))
-                                        }
+                                        onChange={(event) => {
+                                            setCurrentPage(1);
+                                            setPageSize(Number(event.target.value));
+                                        }}
                                         disabled={loading}
                                     >
                                         <option value={10}>10</option>
@@ -652,8 +621,8 @@ export default function Dashboard() {
                                 <button
                                     type="button"
                                     className="pagination-button"
-                                    disabled={currentPage === 1 || loading}
-                                    onClick={() => goToPage(currentPage - 1)}
+                                    disabled={visiblePage === 1 || loading}
+                                    onClick={() => goToPage(visiblePage - 1)}
                                     aria-label="Previous page"
                                 >
                                     Previous
@@ -681,9 +650,9 @@ export default function Dashboard() {
                                         <button
                                             type="button"
                                             key={page}
-                                            className={`pagination-button ${currentPage === page ? "active" : ""
+                                            className={`pagination-button ${visiblePage === page ? "active" : ""
                                                 }`}
-                                            aria-current={currentPage === page ? "page" : undefined}
+                                            aria-current={visiblePage === page ? "page" : undefined}
                                             disabled={loading}
                                             onClick={() => goToPage(page)}
                                         >
@@ -712,8 +681,8 @@ export default function Dashboard() {
                                 <button
                                     type="button"
                                     className="pagination-button"
-                                    disabled={currentPage === totalPages || loading}
-                                    onClick={() => goToPage(currentPage + 1)}
+                                    disabled={visiblePage === totalPages || loading}
+                                    onClick={() => goToPage(visiblePage + 1)}
                                     aria-label="Next page"
                                 >
                                     Next
