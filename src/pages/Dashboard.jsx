@@ -54,9 +54,46 @@ function getSourcePrice(prices, labels) {
         }) ?? null
     );
 }
+function SortableHeader({ label, sortKey, sortBy, onSort }) {
+    const isAscending = sortBy === `${sortKey}-asc`;
+    const isDescending = sortBy === `${sortKey}-desc`;
+    const isActive = isAscending || isDescending;
 
+    return (
+        <th aria-sort={
+            isAscending
+                ? "ascending"
+                : isDescending
+                    ? "descending"
+                    : "none"
+        }>
+            <button
+                type="button"
+                onClick={() => onSort(sortKey)}
+                className="sortable-header-button"
+                title={`Sort by ${label}`}
+            >
+                {label}
+                <span aria-hidden="true">
+                    {isAscending ? " ▲" : isDescending ? " ▼" : " ↕"}
+                </span>
+            </button>
+        </th>
+    );
+}
 export default function Dashboard() {
     const [sortBy, setSortBy] = useState("default");
+    const handleHeaderSort = (sortKey) => {
+        setCurrentPage(1);
+
+        setSortBy((currentSort) => {
+            if (currentSort === `${sortKey}-asc`) {
+                return `${sortKey}-desc`;
+            }
+
+            return `${sortKey}-asc`;
+        });
+    };
     const [activePage, setActivePage] = useState("Dashboard");
     const [search, setSearch] = useState("");
     const [brand, setBrand] = useState(DEFAULT_BRAND);
@@ -527,10 +564,30 @@ export default function Dashboard() {
                             <table className="product-table">
                                 <thead>
                                     <tr>
-                                        <th>Product</th>
-                                        <th>Brand</th>
-                                        <th>Model / Code</th>
-                                        <th>Category</th>
+                                        <SortableHeader
+                                            label="Product"
+                                            sortKey="name"
+                                            sortBy={sortBy}
+                                            onSort={handleHeaderSort}
+                                        />
+                                        <SortableHeader
+                                            label="Brand"
+                                            sortKey="brand"
+                                            sortBy={sortBy}
+                                            onSort={handleHeaderSort}
+                                        />
+                                        <SortableHeader
+                                            label="Model / Code"
+                                            sortKey="model"
+                                            sortBy={sortBy}
+                                            onSort={handleHeaderSort}
+                                        />
+                                        <SortableHeader
+                                            label="Category"
+                                            sortKey="category"
+                                            sortBy={sortBy}
+                                            onSort={handleHeaderSort}
+                                        />
                                         <th>MRP Source Value</th>
                                         <th>DP Source Value</th>
                                         <th>Price Details</th>

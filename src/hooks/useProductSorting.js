@@ -55,10 +55,34 @@ export default function useProductSorting({
         const result = String(a.brand_id ?? "").localeCompare(
           String(b.brand_id ?? ""),
           undefined,
-          { sensitivity: "base" }
+          { sensitivity: "base", numeric: true }
         );
 
         return sortBy === "brand-asc" ? result : -result;
+      });
+    }
+
+    if (sortBy === "model-asc" || sortBy === "model-desc") {
+      sorted.sort((a, b) => {
+        const result = String(a.model ?? "").localeCompare(
+          String(b.model ?? ""),
+          undefined,
+          { sensitivity: "base", numeric: true }
+        );
+
+        return sortBy === "model-asc" ? result : -result;
+      });
+    }
+
+    if (sortBy === "category-asc" || sortBy === "category-desc") {
+      sorted.sort((a, b) => {
+        const result = String(a.category_id ?? "").localeCompare(
+          String(b.category_id ?? ""),
+          undefined,
+          { sensitivity: "base", numeric: true }
+        );
+
+        return sortBy === "category-asc" ? result : -result;
       });
     }
 
