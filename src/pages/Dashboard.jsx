@@ -57,7 +57,6 @@ function getSourcePrice(prices, labels) {
 function SortableHeader({ label, sortKey, sortBy, onSort }) {
     const isAscending = sortBy === `${sortKey}-asc`;
     const isDescending = sortBy === `${sortKey}-desc`;
-    const isActive = isAscending || isDescending;
 
     return (
         <th aria-sort={

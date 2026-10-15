@@ -540,6 +540,29 @@ button {
   border-collapse: collapse;
   text-align: left;
 }
+.sortable-header-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+
+.sortable-header-button:hover {
+    opacity: 0.8;
+}
+
+.sortable-header-button:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+    border-radius: 3px;
+}
 
 .product-table th {
   padding: 14px 16px;
