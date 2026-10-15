@@ -2,11 +2,12 @@ import { getAllPrices } from "../services/priceService";
 // import { matchesPriceType } from "../utils/priceHelpers";
 import useProductFilters from "../hooks/useProductFilters";
 import { useEffect, useMemo, useState } from "react";
-
+import useProductSorting from "../hooks/useProductSorting";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import StatCard from "../components/StatCard";
 import PriceLookup from "../components/PriceLookup";
+
 
 import { getProducts } from "../services/productService";
 import { getProductPrices } from "../services/priceService";
@@ -55,6 +56,7 @@ function getSourcePrice(prices, labels) {
 }
 
 export default function Dashboard() {
+    const [sortBy, setSortBy] = useState("default");
     const [activePage, setActivePage] = useState("Dashboard");
     const [search, setSearch] = useState("");
     const [brand, setBrand] = useState(DEFAULT_BRAND);
@@ -140,15 +142,24 @@ export default function Dashboard() {
         allPrices,
     });
 
-    const totalProducts = filteredProducts.length;
+    const sortedProducts = useProductSorting({
+        products: filteredProducts,
+        sortBy,
+        allPrices,
+        priceType,
+    });
+
+
+    const totalProducts = sortedProducts.length;
     const totalPages = Math.max(1, Math.ceil(totalProducts / pageSize));
     const visiblePage = Math.min(currentPage, totalPages);
 
     const paginatedProducts = useMemo(() => {
         const startIndex = (visiblePage - 1) * pageSize;
 
-        return filteredProducts.slice(startIndex, startIndex + pageSize);
-    }, [filteredProducts, visiblePage, pageSize]);
+        return sortedProducts.slice(startIndex, startIndex + pageSize);
+    }, [sortedProducts, visiblePage, pageSize]);
+
 
     const startRecord =
         totalProducts === 0 ? 0 : (visiblePage - 1) * pageSize + 1;
@@ -462,6 +473,25 @@ export default function Dashboard() {
                                     <option value="MRCP">MRCP</option>
                                     <option value="Dealer Price">Dealer Price</option>
                                     <option value="Distributor Price">Distributor Price</option>
+                                </select>
+                            </label>
+
+                            <label className="filter-field">
+                                <span>Sort By</span>
+                                <select
+                                    value={sortBy}
+                                    onChange={(event) => {
+                                        setCurrentPage(1);
+                                        setSortBy(event.target.value);
+                                    }}
+                                >
+                                    <option value="default">Default Order</option>
+                                    <option value="name-asc">Product Name: A–Z</option>
+                                    <option value="name-desc">Product Name: Z–A</option>
+                                    <option value="brand-asc">Brand: A–Z</option>
+                                    <option value="brand-desc">Brand: Z–A</option>
+                                    <option value="price-asc">Price: Low to High</option>
+                                    <option value="price-desc">Price: High to Low</option>
                                 </select>
                             </label>
 
