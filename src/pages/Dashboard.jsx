@@ -35,25 +35,50 @@ const formatINR = (value) => {
     }).format(amount);
 };
 
+
+
+
 function getSourcePrice(prices, labels) {
-    return (
-        prices.find((price) => {
-            const label = String(price.source_price_label ?? "")
-                .trim()
-                .toLowerCase();
+    const matches = prices.filter((price) => {
+        const label = String(price.source_price_label ?? "")
+            .trim()
+            .toLowerCase();
+        const type = String(price.price_type ?? "")
+            .trim()
+            .toLowerCase();
 
-            const type = String(price.price_type ?? "")
-                .trim()
-                .toLowerCase();
+        return labels.some(
+            (candidate) =>
+                label === candidate.toLowerCase() ||
+                type === candidate.toLowerCase()
+        );
+    });
 
-            return labels.some(
-                (candidate) =>
-                    label === candidate.toLowerCase() ||
-                    type === candidate.toLowerCase()
-            );
-        }) ?? null
+    const statusOf = (price) =>
+        String(price.is_current ?? "").trim().toUpperCase();
+
+    const active = matches.filter((price) =>
+        statusOf(price).startsWith("ACTIVE")
     );
+
+    const eligible = active.length
+        ? active
+        : matches.filter((price) =>
+            statusOf(price) === "LIKELY CURRENT - VERIFY"
+        );
+
+    if (!eligible.length) return null;
+
+    return [...eligible].sort((a, b) => {
+        const dateA = new Date(a.effective_from ?? 0).getTime() || 0;
+        const dateB = new Date(b.effective_from ?? 0).getTime() || 0;
+        return dateB - dateA;
+    })[0];
 }
+
+
+
+
 
 export default function Dashboard() {
     const [sortBy, setSortBy] = useState("default");
@@ -65,6 +90,7 @@ export default function Dashboard() {
     const [allPrices, setAllPrices] = useState([]);
     const [allPricesLoading, setAllPricesLoading] = useState(false);
     const [allPricesError, setAllPricesError] = useState("");
+    const [priceRefreshKey, setPriceRefreshKey] = useState(0);
 
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -240,7 +266,7 @@ export default function Dashboard() {
         return () => {
             cancelled = true;
         };
-    }, [paginatedProducts]);
+    }, [paginatedProducts, priceRefreshKey]);
 
     useEffect(() => {
         let cancelled = false;
@@ -271,7 +297,7 @@ export default function Dashboard() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [priceRefreshKey]);
 
     // Fetch selected-product prices independently of the current page.
     useEffect(() => {
@@ -310,7 +336,7 @@ export default function Dashboard() {
         return () => {
             cancelled = true;
         };
-    }, [selectedProductId]);
+    }, [selectedProductId, priceRefreshKey]);
 
     function goToPage(page) {
         setCurrentPage(Math.min(Math.max(page, 1), totalPages));
@@ -810,7 +836,11 @@ export default function Dashboard() {
                         </section>
                     )}
 
-                    <PriceLookup />
+                    <PriceLookup
+                        onPriceUpdated={() => {
+                            setPriceRefreshKey((current) => current + 1);
+                        }}
+                    />
 
                     <section className="bottom-grid">
                         <article className="info-panel">
