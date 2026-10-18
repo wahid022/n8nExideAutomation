@@ -2,8 +2,7 @@
 const PRICES_API_URL = import.meta.env.VITE_PRICES_API_URL;
 
 const VERIFIED_CURRENT_STATUSES = new Set([
-  // Add a status here only after your business rules explicitly
-  // establish that it means verified and current.
+  // Add a status only when business rules confirm it is verified and current.
 ]);
 
 const REVIEW_STATUSES = new Set([
@@ -55,15 +54,24 @@ async function fetchPrices(filters = {}) {
     }
   });
 
-  const response = await fetch(url.toString());
+  // Request fresh pricing data instead of using a cached response.
+  const response = await fetch(url.toString(), {
+    cache: "no-store",
+  });
 
   if (!response.ok) {
     throw new Error(`Pricing API failed with HTTP ${response.status}.`);
   }
 
-  const result = await response.json();
+  let result;
 
-  if (!result.success || !Array.isArray(result.data)) {
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error("The Pricing API returned invalid JSON.");
+  }
+
+  if (!result?.success || !Array.isArray(result.data)) {
     throw new Error("The Pricing API returned an unexpected response.");
   }
 
@@ -71,8 +79,8 @@ async function fetchPrices(filters = {}) {
 }
 
 export function getProductPrices(productId) {
-  if (!productId?.trim()) {
-    throw new Error("Please enter a product ID.");
+  if (typeof productId !== "string" || !productId.trim()) {
+    throw new Error("Please enter a valid product ID.");
   }
 
   return fetchPrices({ productId: productId.trim() });
@@ -85,7 +93,6 @@ export function getPricesByType(priceType) {
 export function getAllPrices() {
   return fetchPrices();
 }
-
 
 const UPDATE_PRICE_API_URL =
   import.meta.env.VITE_UPDATE_PRICE_API_URL ||
@@ -115,6 +122,7 @@ export async function updateProductPrice({
     headers: {
       "Content-Type": "application/json",
     },
+    cache: "no-store",
     body: JSON.stringify({
       product_price_id,
       source_price_value: price,
@@ -122,7 +130,15 @@ export async function updateProductPrice({
     }),
   });
 
-  const result = await response.json().catch(() => null);
+  let result;
+
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error(
+      `Price update returned an invalid response (HTTP ${response.status}).`
+    );
+  }
 
   if (!response.ok || result?.success !== true) {
     throw new Error(

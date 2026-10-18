@@ -837,7 +837,45 @@ export default function Dashboard() {
                     )}
 
                     <PriceLookup
-                        onPriceUpdated={() => {
+                        onPriceUpdated={(updatedRecord) => {
+                            // Immediately update the relevant price records in React state.
+                            if (updatedRecord?.product_id && updatedRecord?.product_price_id) {
+                                const productId = updatedRecord.product_id;
+                                const recordId = updatedRecord.product_price_id;
+
+                                const mergeUpdatedRecord = (records) => {
+                                    const exists = records.some(
+                                        (price) => price.product_price_id === recordId
+                                    );
+
+                                    if (exists) {
+                                        return records.map((price) =>
+                                            price.product_price_id === recordId
+                                                ? { ...price, ...updatedRecord }
+                                                : price
+                                        );
+                                    }
+
+                                    return [...records, updatedRecord];
+                                };
+
+                                setPagePrices((previous) => ({
+                                    ...previous,
+                                    [productId]: mergeUpdatedRecord(
+                                        previous[productId] ?? []
+                                    ),
+                                }));
+
+                                setAllPrices((previous) =>
+                                    mergeUpdatedRecord(previous)
+                                );
+
+                                setSelectedPrices((previous) =>
+                                    mergeUpdatedRecord(previous)
+                                );
+                            }
+
+                            // Also refetch pricing from the API to keep all views in sync.
                             setPriceRefreshKey((current) => current + 1);
                         }}
                     />

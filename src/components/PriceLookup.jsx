@@ -2,7 +2,6 @@
 import { useState } from "react";
 import {
   getProductPrices,
-  getPriceStatus,
   updateProductPrice,
 } from "../services/priceService";
 
@@ -26,10 +25,9 @@ const formatINR = (value) => {
 
 const formatDate = (value) => {
   if (value === null || value === undefined || value === "") {
-    return "Not available";
+    return "";
   }
 
-  // Handle Excel serial dates.
   if (
     typeof value === "number" ||
     (typeof value === "string" && /^\d+(\.\d+)?$/.test(value.trim()))
@@ -46,12 +44,10 @@ const formatDate = (value) => {
   }
 
   const text = String(value).trim();
-
-  // Handle ISO dates and date-times.
   const isoMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
+
   if (isoMatch) return isoMatch[1];
 
-  // Handle DD/MM/YYYY and DD-MM-YYYY.
   const dmyMatch = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
 
   if (dmyMatch) {
@@ -59,71 +55,17 @@ const formatDate = (value) => {
     return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
   }
 
-  return text;
+  return "";
 };
-
-const displayValue = (value) => {
-  if (value === null || value === undefined || value === "") {
-    return "Not available";
-  }
-
-  return String(value);
-};
-
-const isAppendedHistoryEntry = (price) =>
-  String(price.notes || "")
-    .toLowerCase()
-    .includes("price history entry appended from");
-
-function StatusBadge({ status }) {
-  const stylesByStatus = {
-    review: {
-      background: "#fff7ed",
-      color: "#9a3412",
-      label: "Needs verification",
-    },
-    "verified-current": {
-      background: "#dcfce7",
-      color: "#166534",
-      label: "Verified current",
-    },
-    unverified: {
-      background: "#f1f5f9",
-      color: "#475569",
-      label: "Unverified",
-    },
-  };
-
-  const style = stylesByStatus[status] || stylesByStatus.unverified;
-
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        padding: "4px 8px",
-        borderRadius: 6,
-        background: style.background,
-        color: style.color,
-        fontSize: 11,
-        fontWeight: 700,
-        lineHeight: 1.5,
-        whiteSpace: "normal",
-      }}
-    >
-      {style.label}
-    </span>
-  );
-}
 
 function EditPriceForm({ price, onCancel, onSaved }) {
   const [newPrice, setNewPrice] = useState(
     String(price.source_price_value ?? "")
   );
 
-  const formattedDate = formatDate(price.effective_from);
-
   const [effectiveFrom, setEffectiveFrom] = useState(
-    formattedDate === "Not available" ? "" : formattedDate
+    formatDate(price.effective_from) ||
+      new Date().toISOString().slice(0, 10)
   );
 
   const [saving, setSaving] = useState(false);
@@ -150,17 +92,17 @@ function EditPriceForm({ price, onCancel, onSaved }) {
     setError("");
 
     try {
-      await updateProductPrice({
+      const updateResult = await updateProductPrice({
         product_price_id: price.product_price_id,
         source_price_value: amount,
         effective_from: effectiveFrom,
       });
 
-      await onSaved();
+      await onSaved(updateResult);
     } catch (err) {
       setError(
         err.message ||
-          "Unable to confirm the update. Check price history before retrying."
+          "Unable to save the price. Check the current price before retrying."
       );
     } finally {
       setSaving(false);
@@ -194,21 +136,7 @@ function EditPriceForm({ price, onCancel, onSaved }) {
         minWidth: 220,
       }}
     >
-      <strong>Add Price Revision</strong>
-
-      <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>
-        This creates a new price-history record. The original record remains
-        unchanged, and the new entry requires verification.
-      </p>
-
-      <label style={{ fontSize: 13, fontWeight: 600 }}>
-        Existing Price ID
-        <input
-          style={fieldStyle}
-          value={price.product_price_id || ""}
-          readOnly
-        />
-      </label>
+      <strong>Edit Product Price</strong>
 
       <label style={{ fontSize: 13, fontWeight: 600 }}>
         Product ID
@@ -229,7 +157,7 @@ function EditPriceForm({ price, onCancel, onSaved }) {
       </label>
 
       <label style={{ fontSize: 13, fontWeight: 600 }}>
-        New Source Price (INR)
+        Price (INR)
         <input
           style={fieldStyle}
           type="number"
@@ -285,7 +213,7 @@ function EditPriceForm({ price, onCancel, onSaved }) {
             cursor: saving ? "wait" : "pointer",
           }}
         >
-          {saving ? "Saving..." : "Save Price Revision"}
+          {saving ? "Saving..." : "Save Price"}
         </button>
 
         <button
@@ -325,7 +253,6 @@ export default function PriceLookup({ onPriceUpdated }) {
 
     const response = await getProductPrices(normalizedId);
     setResult(response);
-
     return response;
   }
 
@@ -348,86 +275,60 @@ export default function PriceLookup({ onPriceUpdated }) {
     }
   }
 
-async function handlePriceSaved() {
-  try {
-    await loadPrices(productId);
+  async function handlePriceSaved(updateResult) {
     setEditingPrice(null);
 
-    setNotice(
-      "Price revision saved. The new record requires verification."
-    );
-
-    // Refresh the main dashboard after the history refresh succeeds.
-    onPriceUpdated?.();
-  } catch {
-    // The write may have succeeded even if refreshing failed.
-    // Do not automatically submit the write a second time.
-    setEditingPrice(null);
-
-    setNotice(
-      "The update may have succeeded, but the table could not refresh. Search this product again and check its history before retrying."
-    );
-
-    // Refresh the dashboard too, because the write may have succeeded.
-    onPriceUpdated?.();
+    try {
+      await loadPrices(productId);
+      setNotice("Price updated successfully.");
+    } catch (err) {
+      setNotice(
+        err.message ||
+          "Price saved, but pricing details could not be refreshed."
+      );
+    } finally {
+      // Notify Dashboard so the catalogue reloads immediately.
+      onPriceUpdated?.(updateResult?.updated_record);
+    }
   }
-}
 
-  const styles = {
-    card: {
-      background: "var(--card-bg, #ffffff)",
-      color: "var(--text-color, #172033)",
-      border: "1px solid var(--border-color, #e5e7eb)",
-      borderRadius: 12,
-      padding: 20,
-      marginTop: 20,
-      overflowX: "auto",
-    },
-    input: {
-      padding: "10px 12px",
-      border: "1px solid #cbd5e1",
-      borderRadius: 8,
-      minWidth: 220,
-      fontSize: 14,
-    },
-    button: {
-      padding: "8px 11px",
-      border: 0,
-      borderRadius: 7,
-      background: "#2563eb",
-      color: "#ffffff",
-      cursor: "pointer",
-      fontWeight: 600,
-      fontSize: 12,
-      whiteSpace: "nowrap",
-    },
-    table: {
-      width: "100%",
-      borderCollapse: "collapse",
-      marginTop: 16,
-      fontSize: 13,
-      minWidth: 1550,
-    },
-    cell: {
-      textAlign: "left",
-      padding: "12px 10px",
-      borderBottom: "1px solid #e5e7eb",
-      verticalAlign: "top",
-    },
+  const cellStyle = {
+    textAlign: "left",
+    padding: "12px 10px",
+    borderBottom: "1px solid #e5e7eb",
+    verticalAlign: "top",
+  };
+
+  const buttonStyle = {
+    padding: "8px 12px",
+    border: 0,
+    borderRadius: 7,
+    background: "#2563eb",
+    color: "#ffffff",
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: 12,
+    whiteSpace: "nowrap",
   };
 
   const prices = result?.data ?? [];
 
-  const reviewCount = prices.filter(
-    (price) => getPriceStatus(price) !== "verified-current"
-  ).length;
-
   return (
-    <section style={styles.card}>
-      <h2 style={{ marginTop: 0 }}>Product Pricing Lookup</h2>
+    <section
+      style={{
+        background: "var(--card-bg, #ffffff)",
+        color: "var(--text-color, #172033)",
+        border: "1px solid var(--border-color, #e5e7eb)",
+        borderRadius: 12,
+        padding: 20,
+        marginTop: 20,
+        overflowX: "auto",
+      }}
+    >
+      <h2 style={{ marginTop: 0 }}>Product Pricing</h2>
 
       <p style={{ color: "#64748b", marginTop: 4 }}>
-        Search source price records by product ID.
+        Search and edit existing product prices.
       </p>
 
       <form
@@ -441,23 +342,23 @@ async function handlePriceSaved() {
       >
         <input
           aria-label="Product ID"
-          style={styles.input}
           value={productId}
           onChange={(event) => setProductId(event.target.value)}
           placeholder="e.g. PRD000001"
           required
+          style={{
+            padding: "10px 12px",
+            border: "1px solid #cbd5e1",
+            borderRadius: 8,
+            minWidth: 220,
+            fontSize: 14,
+          }}
         />
 
         <button
           type="submit"
-          style={{
-            ...styles.button,
-            padding: "10px 16px",
-            fontSize: 14,
-            cursor: loading ? "wait" : "pointer",
-            opacity: loading ? 0.7 : 1,
-          }}
           disabled={loading}
+          style={buttonStyle}
         >
           {loading ? "Searching..." : "Find Prices"}
         </button>
@@ -491,53 +392,37 @@ async function handlePriceSaved() {
             <strong>Product ID:</strong>{" "}
             {result.filters?.productId || productId}
             {" · "}
-            <strong>Records:</strong> {result.count ?? prices.length}
-            {" · "}
-            <strong>Needs verification:</strong> {reviewCount}
-          </p>
-
-          <p
-            style={{
-              padding: 12,
-              borderRadius: 8,
-              background: "#fff7ed",
-              color: "#9a3412",
-              fontSize: 13,
-            }}
-          >
-            These are source price records, not automatically approved selling
-            prices. Only records explicitly verified as current should be used
-            as approved pricing for quotations.
+            <strong>Price records:</strong> {prices.length}
           </p>
 
           {prices.length === 0 ? (
             <p>No pricing records found for this product ID.</p>
           ) : (
-            <table style={styles.table}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                marginTop: 16,
+                fontSize: 13,
+                minWidth: 900,
+              }}
+            >
               <thead>
                 <tr>
                   {[
-                    "Price ID",
-                    "Record Type",
                     "Price Type",
                     "Source Label",
-                    "Source Value",
+                    "Price",
                     "Basic Price",
                     "GST Rate",
                     "GST Amount",
                     "Price Excl. GST",
                     "Price Incl. GST",
-                    "Effective From",
-                    "Verification",
-                    "Review Status",
                     "Actions",
                   ].map((heading) => (
                     <th
                       key={heading}
-                      style={{
-                        ...styles.cell,
-                        whiteSpace: "nowrap",
-                      }}
+                      style={{ ...cellStyle, whiteSpace: "nowrap" }}
                     >
                       {heading}
                     </th>
@@ -547,102 +432,51 @@ async function handlePriceSaved() {
 
               <tbody>
                 {prices.map((price) => {
-                  const status = getPriceStatus(price);
-                  const appended = isAppendedHistoryEntry(price);
-
                   const isEditing =
                     editingPrice?.product_price_id ===
                     price.product_price_id;
 
                   return (
                     <tr key={price.product_price_id}>
-                      <td style={styles.cell}>
-                        {displayValue(price.product_price_id)}
+                      <td style={cellStyle}>
+                        {price.price_type || "—"}
                       </td>
 
-                      <td style={styles.cell}>
-                        {appended ? (
-                          <span
-                            style={{
-                              display: "inline-block",
-                              padding: "4px 7px",
-                              borderRadius: 6,
-                              background: "#eff6ff",
-                              color: "#1d4ed8",
-                              fontSize: 11,
-                              fontWeight: 700,
-                            }}
-                          >
-                            Appended history
-                          </span>
-                        ) : (
-                          "Source record"
-                        )}
+                      <td style={cellStyle}>
+                        {price.source_price_label || "—"}
                       </td>
 
-                      <td style={styles.cell}>
-                        {displayValue(price.price_type)}
-                      </td>
-
-                      <td style={styles.cell}>
-                        {displayValue(price.source_price_label)}
-                      </td>
-
-                      <td style={styles.cell}>
+                      <td style={cellStyle}>
                         {formatINR(price.source_price_value)}
                       </td>
 
-                      <td style={styles.cell}>
+                      <td style={cellStyle}>
                         {formatINR(price.basic_price)}
                       </td>
 
-                      <td style={styles.cell}>
-                        {price.gst_rate_percent === null ||
-                        price.gst_rate_percent === undefined ||
-                        price.gst_rate_percent === ""
-                          ? "Not available"
+                      <td style={cellStyle}>
+                        {price.gst_rate_percent == null
+                          ? "—"
                           : `${price.gst_rate_percent}%`}
                       </td>
 
-                      <td style={styles.cell}>
+                      <td style={cellStyle}>
                         {formatINR(price.gst_amount)}
                       </td>
 
-                      <td style={styles.cell}>
+                      <td style={cellStyle}>
                         {formatINR(price.price_excluding_gst)}
                       </td>
 
-                      <td style={styles.cell}>
+                      <td style={cellStyle}>
                         {formatINR(price.price_including_gst)}
                       </td>
 
-                      <td style={styles.cell}>
-                        {formatDate(price.effective_from)}
-                      </td>
-
-                      <td style={styles.cell}>
-                        {displayValue(price.verification_status)}
-                      </td>
-
-                      <td style={styles.cell}>
-                        <StatusBadge status={status} />
-                        <div
-                          style={{
-                            marginTop: 5,
-                            fontSize: 11,
-                            color: "#64748b",
-                          }}
-                        >
-                          Source status: {displayValue(price.is_current)}
-                        </div>
-                      </td>
-
-                      <td style={{ ...styles.cell, minWidth: 240 }}>
+                      <td style={cellStyle}>
                         <button
                           type="button"
-                          title="Create a new price-history record. The existing record remains unchanged."
                           style={{
-                            ...styles.button,
+                            ...buttonStyle,
                             background: isEditing ? "#475569" : "#2563eb",
                           }}
                           onClick={() => {
@@ -652,9 +486,7 @@ async function handlePriceSaved() {
                           }}
                           disabled={Boolean(editingPrice) && !isEditing}
                         >
-                          {isEditing
-                            ? "Close Editor"
-                            : "Add Price Revision"}
+                          {isEditing ? "Close Editor" : "Edit Price"}
                         </button>
 
                         {isEditing && (
@@ -671,63 +503,6 @@ async function handlePriceSaved() {
                 })}
               </tbody>
             </table>
-          )}
-
-          {prices.length > 0 && (
-            <details style={{ marginTop: 16 }}>
-              <summary style={{ cursor: "pointer" }}>
-                View source references and notes
-              </summary>
-
-              <div style={{ marginTop: 12 }}>
-                {prices.map((price) => {
-                  const appended = isAppendedHistoryEntry(price);
-
-                  return (
-                    <div
-                      key={price.product_price_id}
-                      style={{
-                        padding: "12px 0",
-                        borderBottom: "1px solid #e5e7eb",
-                        overflowWrap: "anywhere",
-                      }}
-                    >
-                      <strong>{price.product_price_id}</strong>
-
-                      <p>
-                        <strong>Record type:</strong>{" "}
-                        {appended
-                          ? "Appended price-history entry"
-                          : "Original source record"}
-                      </p>
-
-                      <p>
-                        <strong>Original source reference:</strong>{" "}
-                        {displayValue(price.source_row_reference)}
-                      </p>
-
-                      {appended && (
-                        <p style={{ color: "#64748b", fontSize: 12 }}>
-                          This entry inherits the source reference from the
-                          record it was copied from. It does not confirm that
-                          the new price came from a new official price list.
-                        </p>
-                      )}
-
-                      <p>
-                        <strong>Effective to:</strong>{" "}
-                        {formatDate(price.effective_to)}
-                      </p>
-
-                      <p>
-                        <strong>Notes:</strong>{" "}
-                        {displayValue(price.notes)}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </details>
           )}
         </div>
       )}
