@@ -1,82 +1,101 @@
 
 import { useMemo } from "react";
 
-function getPriceForProduct(product, allPrices, priceType) {
-  const matchingPrices = allPrices.filter((price) => {
-    if (price.product_id !== product.product_id) return false;
+function getValue(product, alias, workbookField) {
+  return product?.[alias] ?? product?.[workbookField] ?? "";
+}
 
-    if (priceType === "All Price Types") return true;
+function getName(product) {
+  return String(
+    getValue(product, "product_name", "Model / SKU") ||
+    getValue(product, "model", "Model / SKU")
+  ).trim();
+}
 
-    const label = String(price.source_price_label ?? "")
-      .trim()
-      .toLowerCase();
+function getBrand(product) {
+  return String(getValue(product, "brand", "Brand")).trim();
+}
 
-    const type = String(price.price_type ?? "")
-      .trim()
-      .toLowerCase();
+function getPrice(product, priceType) {
+  const field = priceType === "MRP" ? "MRP" : "Dealer Price";
+  const alias = priceType === "MRP" ? "mrp" : "dealer_price";
+  const value = getValue(product, alias, field);
 
-    const selected = priceType.toLowerCase();
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return null;
+  }
 
-    return label === selected || type === selected;
-  });
-
-  const values = matchingPrices
-    .map((price) => Number(price.source_price_value))
-    .filter((value) => Number.isFinite(value));
-
-  return values.length ? Math.min(...values) : null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 export default function useProductSorting({
-  products,
-  sortBy,
-  allPrices,
-  priceType,
+  products = [],
+  sortBy = "default",
+  priceType = "All Price Types",
 }) {
   return useMemo(() => {
     if (sortBy === "default") return products;
 
     const sorted = [...products];
 
-    if (sortBy === "name-asc" || sortBy === "name-desc") {
-      sorted.sort((a, b) => {
-        const result = String(a.product_name ?? "").localeCompare(
-          String(b.product_name ?? ""),
-          undefined,
-          { sensitivity: "base" }
+    switch (sortBy) {
+      case "name-asc":
+        sorted.sort((a, b) =>
+          getName(a).localeCompare(getName(b), undefined, {
+            sensitivity: "base",
+            numeric: true,
+          })
         );
+        break;
 
-        return sortBy === "name-asc" ? result : -result;
-      });
-    }
-
-    if (sortBy === "brand-asc" || sortBy === "brand-desc") {
-      sorted.sort((a, b) => {
-        const result = String(a.brand_id ?? "").localeCompare(
-          String(b.brand_id ?? ""),
-          undefined,
-          { sensitivity: "base" }
+      case "name-desc":
+        sorted.sort((a, b) =>
+          getName(b).localeCompare(getName(a), undefined, {
+            sensitivity: "base",
+            numeric: true,
+          })
         );
+        break;
 
-        return sortBy === "brand-asc" ? result : -result;
-      });
-    }
+      case "brand-asc":
+        sorted.sort((a, b) =>
+          getBrand(a).localeCompare(getBrand(b), undefined, {
+            sensitivity: "base",
+          })
+        );
+        break;
 
-    if (sortBy === "price-asc" || sortBy === "price-desc") {
-      sorted.sort((a, b) => {
-        const priceA = getPriceForProduct(a, allPrices, priceType);
-        const priceB = getPriceForProduct(b, allPrices, priceType);
+      case "brand-desc":
+        sorted.sort((a, b) =>
+          getBrand(b).localeCompare(getBrand(a), undefined, {
+            sensitivity: "base",
+          })
+        );
+        break;
 
-        // Products without prices stay at the end in either direction.
-        if (priceA === null) return priceB === null ? 0 : 1;
-        if (priceB === null) return -1;
+      case "price-asc":
+      case "price-desc": {
+        const direction = sortBy === "price-asc" ? 1 : -1;
 
-        return sortBy === "price-asc"
-          ? priceA - priceB
-          : priceB - priceA;
-      });
+        sorted.sort((a, b) => {
+          const priceA = getPrice(a, priceType);
+          const priceB = getPrice(b, priceType);
+
+          // Keep products without the selected price at the end.
+          if (priceA === null && priceB === null) return 0;
+          if (priceA === null) return 1;
+          if (priceB === null) return -1;
+
+          return (priceA - priceB) * direction;
+        });
+        break;
+      }
+
+      default:
+        break;
     }
 
     return sorted;
-  }, [products, sortBy, allPrices, priceType]);
+  }, [products, sortBy, priceType]);
 }

@@ -10,10 +10,27 @@ export async function getProducts() {
 
   const data = await response.json();
 
-  // Support either a direct array or n8n-style items.
   if (!Array.isArray(data)) {
     throw new Error("Unexpected API response: expected an array of products.");
   }
 
-  return data.map((item) => item.json ?? item);
+  return data.map((item) => {
+    const product = item.json ?? item;
+
+    return {
+      ...product,
+      product_id: product["Product Code"] ?? "",
+      product_name: product["Model / SKU"] ?? "",
+      brand: product["Brand"] ?? "",
+      category: product["Category"] ?? "",
+      sub_category: product["Sub Category"] ?? "",
+      model: product["Model / SKU"] ?? "",
+      mrp: product["MRP"] ?? null,
+      dealer_price: product["Dealer Price"] ?? null,
+      warranty: product["Warranty"] ?? "",
+      specs: product["Specs / Capacity"] ?? "",
+      hsn: product["HSN"] ?? "",
+      effective_from: product["Effective From"] ?? "",
+    };
+  });
 }

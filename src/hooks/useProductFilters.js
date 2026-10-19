@@ -1,68 +1,74 @@
 
 import { useMemo } from "react";
-import { matchesPriceType } from "../utils/priceHelpers";
 
 const DEFAULT_BRAND = "All Brands";
 const DEFAULT_CATEGORY = "All Categories";
+const DEFAULT_PRICE_TYPE = "All Price Types";
+
+function getValue(product, alias, workbookField) {
+  return product?.[alias] ?? product?.[workbookField] ?? "";
+}
+
+function hasPrice(product, priceType) {
+  if (priceType === DEFAULT_PRICE_TYPE) return true;
+
+  const field = priceType === "MRP" ? "MRP" : "Dealer Price";
+  const alias = priceType === "MRP" ? "mrp" : "dealer_price";
+  const value = getValue(product, alias, field);
+
+  return value !== null &&
+    value !== undefined &&
+    String(value).trim() !== "" &&
+    Number.isFinite(Number(value));
+}
 
 export default function useProductFilters({
-  products,
-  search,
-  brand,
-  category,
-  priceType,
-  allPrices,
+  products = [],
+  search = "",
+  brand = DEFAULT_BRAND,
+  category = DEFAULT_CATEGORY,
+  priceType = DEFAULT_PRICE_TYPE,
 }) {
   return useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const pricesByProduct = new Map();
-
-    for (const price of allPrices) {
-      if (!price.product_id) continue;
-
-      const records = pricesByProduct.get(price.product_id) ?? [];
-      records.push(price);
-      pricesByProduct.set(price.product_id, records);
-    }
+    const term = String(search).trim().toLowerCase();
 
     return products.filter((product) => {
       const searchableText = [
-        product.product_id,
-        product.product_name,
-        product.model,
-        product.brand_id,
-        product.category_id,
+        getValue(product, "product_id", "Product Code"),
+        getValue(product, "product_name", "Model / SKU"),
+        getValue(product, "model", "Model / SKU"),
+        getValue(product, "brand", "Brand"),
+        getValue(product, "category", "Category"),
+        getValue(product, "sub_category", "Sub Category"),
+        getValue(product, "specs", "Specs / Capacity"),
+        getValue(product, "hsn", "HSN"),
       ]
-        .filter(Boolean)
+        .filter((value) => value !== null && value !== undefined)
         .join(" ")
         .toLowerCase();
 
-      const matchesSearch = searchableText.includes(term);
+      const productBrand = String(
+        getValue(product, "brand", "Brand")
+      ).trim();
 
+      const productCategory = String(
+        getValue(product, "category", "Category")
+      ).trim();
+
+      const matchesSearch = !term || searchableText.includes(term);
       const matchesBrand =
         brand === DEFAULT_BRAND ||
-        String(product.brand_id ?? "").toLowerCase() ===
-          brand.toLowerCase();
-
+        productBrand.toLowerCase() === brand.toLowerCase();
       const matchesCategory =
         category === DEFAULT_CATEGORY ||
-        String(product.category_id ?? "").toLowerCase() ===
-          category.toLowerCase();
-
-      const productPrices =
-        pricesByProduct.get(product.product_id) ?? [];
-
-      const matchesType = matchesPriceType(
-        productPrices,
-        priceType
-      );
+        productCategory.toLowerCase() === category.toLowerCase();
 
       return (
         matchesSearch &&
         matchesBrand &&
         matchesCategory &&
-        matchesType
+        hasPrice(product, priceType)
       );
     });
-  }, [products, search, brand, category, priceType, allPrices]);
+  }, [products, search, brand, category, priceType]);
 }

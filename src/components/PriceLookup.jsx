@@ -1,9 +1,12 @@
 
-import { useState } from "react";
-import {
-  getProductPrices,
-  updateProductPrice,
-} from "../services/priceService";
+import { useEffect, useMemo, useState } from "react";
+import { getProducts } from "../services/productService";
+
+const UPDATE_URL =
+  import.meta.env.VITE_PRODUCT_MASTER_UPDATE_URL ||
+  "http://localhost:8001/update-product-price";
+
+const PRICE_FIELDS = ["Dealer Price", "MRP"];
 
 const formatINR = (value) => {
   if (value === null || value === undefined || value === "") {
@@ -23,488 +26,423 @@ const formatINR = (value) => {
   }).format(amount);
 };
 
-const formatDate = (value) => {
-  if (value === null || value === undefined || value === "") {
-    return "";
-  }
+function getCode(product) {
+  return String(product["Product Code"] ?? product.product_id ?? "").trim();
+}
 
-  if (
-    typeof value === "number" ||
-    (typeof value === "string" && /^\d+(\.\d+)?$/.test(value.trim()))
-  ) {
-    const serial = Number(value);
+function getPrice(product, field) {
+  const value =
+    field === "MRP"
+      ? product["MRP"] ?? product.mrp
+      : product["Dealer Price"] ?? product.dealer_price;
 
-    if (serial > 0 && serial < 2958466) {
-      return new Date(
-        Date.UTC(1899, 11, 30) + Math.floor(serial) * 86400000
-      )
-        .toISOString()
-        .slice(0, 10);
-    }
-  }
+  return value === null || value === undefined ? "" : String(value);
+}
 
-  const text = String(value).trim();
-  const isoMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
+export default function PriceLookup({ onPriceUpdated }) {
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
-  if (isoMatch) return isoMatch[1];
-
-  const dmyMatch = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-
-  if (dmyMatch) {
-    const [, day, month, year] = dmyMatch;
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-  }
-
-  return "";
-};
-
-function EditPriceForm({ price, onCancel, onSaved }) {
-  const [newPrice, setNewPrice] = useState(
-    String(price.source_price_value ?? "")
-  );
-
-  const [effectiveFrom, setEffectiveFrom] = useState(
-    formatDate(price.effective_from) ||
-      new Date().toISOString().slice(0, 10)
-  );
+  const [search, setSearch] = useState("");
+  const [selectedCode, setSelectedCode] = useState("");
+  const [editingField, setEditingField] = useState("Dealer Price");
+  const [newValue, setNewValue] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  async function loadProducts() {
+    setLoadingProducts(true);
+    setLoadError("");
+
+    try {
+      const data = await getProducts();
+      setProducts(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setLoadError(err.message || "Unable to load the product master.");
+    } finally {
+      setLoadingProducts(false);
+    }
+  }
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const matchingProducts = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) return products;
+
+    return products.filter((product) => {
+      const values = [
+        getCode(product),
+        product["Model / SKU"],
+        product.product_name,
+        product["Brand"],
+        product["Category"],
+      ];
+
+      return values.some((value) =>
+        String(value ?? "").toLowerCase().includes(query)
+      );
+    });
+  }, [products, search]);
+
+  const selectedProduct = products.find(
+    (product) => getCode(product) === selectedCode
+  );
+
+  function selectProduct(product) {
+    const code = getCode(product);
+
+    setSelectedCode(code);
+    setSearch(`${code} — ${product["Model / SKU"] ?? product.product_name ?? ""}`);
+    setEditingField("Dealer Price");
+    setNewValue(getPrice(product, "Dealer Price"));
+    setError("");
+    setNotice("");
+  }
+
+  function changeField(field) {
+    setEditingField(field);
+    setNewValue(selectedProduct ? getPrice(selectedProduct, field) : "");
+    setError("");
+    setNotice("");
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
+    setError("");
+    setNotice("");
 
-    if (saving) return;
-
-    const amount = Number(newPrice);
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setError("Enter a valid price greater than zero.");
+    if (!selectedProduct || !selectedCode) {
+      setError("Select a product before editing its price.");
       return;
     }
 
-    if (!effectiveFrom) {
-      setError("Please select an effective date.");
+    const trimmed = newValue.trim();
+    let value = null;
+
+    if (trimmed !== "") {
+      value = Number(trimmed);
+
+      if (!Number.isFinite(value) || value < 0) {
+        setError("Enter a valid price greater than or equal to zero, or leave it blank.");
+        return;
+      }
+    }
+
+    const currentValue = getPrice(selectedProduct, editingField);
+    const currentNormalized =
+      currentValue.trim() === "" ? null : Number(currentValue);
+
+    if (currentNormalized === value) {
+      setNotice("No changes to save.");
       return;
     }
 
     setSaving(true);
-    setError("");
 
     try {
-      const updateResult = await updateProductPrice({
-        product_price_id: price.product_price_id,
-        source_price_value: amount,
-        effective_from: effectiveFrom,
+      const response = await fetch(UPDATE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          product_code: selectedCode,
+          field: editingField,
+          value,
+        }),
       });
 
-      await onSaved(updateResult);
-    } catch (err) {
-      setError(
-        err.message ||
-          "Unable to save the price. Check the current price before retrying."
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          result.detail || result.message || `Update failed (${response.status}).`
+        );
+      }
+
+      // Update the local product immediately after backend confirmation.
+      const updatedProduct = {
+        ...selectedProduct,
+        [editingField]: result.updated_value ?? value,
+      };
+
+      setProducts((previous) =>
+        previous.map((product) =>
+          getCode(product) === selectedCode ? updatedProduct : product
+        )
       );
+
+      setNewValue(
+        result.updated_value === null || result.updated_value === undefined
+          ? ""
+          : String(result.updated_value)
+      );
+
+      setNotice(
+        `${editingField} saved for ${selectedCode}. Workbook backup created.`
+      );
+
+      if (onPriceUpdated) {
+        await onPriceUpdated({
+          product_code: selectedCode,
+          field: editingField,
+          value: result.updated_value ?? value,
+          product: updatedProduct,
+        });
+      }
+    } catch (err) {
+      setError(err.message || "Unable to update the Product Master.");
     } finally {
       setSaving(false);
     }
   }
 
-  const fieldStyle = {
-    display: "block",
+  const inputStyle = {
     width: "100%",
     boxSizing: "border-box",
-    marginTop: 5,
-    padding: "9px 10px",
+    padding: "10px 12px",
     border: "1px solid #cbd5e1",
-    borderRadius: 7,
-    fontSize: 13,
+    borderRadius: 8,
     background: "#ffffff",
     color: "#172033",
-  };
-
-  return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        display: "grid",
-        gap: 12,
-        padding: 16,
-        marginTop: 12,
-        border: "1px solid #cbd5e1",
-        borderRadius: 10,
-        background: "var(--card-bg, #ffffff)",
-        minWidth: 220,
-      }}
-    >
-      <strong>Edit Product Price</strong>
-
-      <label style={{ fontSize: 13, fontWeight: 600 }}>
-        Product ID
-        <input
-          style={fieldStyle}
-          value={price.product_id || ""}
-          readOnly
-        />
-      </label>
-
-      <label style={{ fontSize: 13, fontWeight: 600 }}>
-        Price Type
-        <input
-          style={fieldStyle}
-          value={price.price_type || "Not available"}
-          readOnly
-        />
-      </label>
-
-      <label style={{ fontSize: 13, fontWeight: 600 }}>
-        Price (INR)
-        <input
-          style={fieldStyle}
-          type="number"
-          min="0.01"
-          step="0.01"
-          required
-          value={newPrice}
-          onChange={(event) => setNewPrice(event.target.value)}
-          disabled={saving}
-        />
-      </label>
-
-      <label style={{ fontSize: 13, fontWeight: 600 }}>
-        Effective From
-        <input
-          style={fieldStyle}
-          type="date"
-          required
-          value={effectiveFrom}
-          onChange={(event) => setEffectiveFrom(event.target.value)}
-          disabled={saving}
-        />
-      </label>
-
-      {error && (
-        <p
-          role="alert"
-          style={{
-            color: "#b91c1c",
-            background: "#fef2f2",
-            padding: 10,
-            borderRadius: 7,
-            margin: 0,
-            fontSize: 13,
-            overflowWrap: "anywhere",
-          }}
-        >
-          {error}
-        </p>
-      )}
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        <button
-          type="submit"
-          disabled={saving}
-          style={{
-            padding: "9px 14px",
-            border: 0,
-            borderRadius: 7,
-            background: saving ? "#94a3b8" : "#2563eb",
-            color: "#ffffff",
-            fontWeight: 600,
-            cursor: saving ? "wait" : "pointer",
-          }}
-        >
-          {saving ? "Saving..." : "Save Price"}
-        </button>
-
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={saving}
-          style={{
-            padding: "9px 14px",
-            border: "1px solid #cbd5e1",
-            borderRadius: 7,
-            background: "#ffffff",
-            color: "#172033",
-            cursor: saving ? "not-allowed" : "pointer",
-          }}
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
-  );
-}
-
-export default function PriceLookup({ onPriceUpdated }) {
-  const [productId, setProductId] = useState("PRD000001");
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [editingPrice, setEditingPrice] = useState(null);
-
-  async function loadPrices(id = productId) {
-    const normalizedId = id.trim();
-
-    if (!normalizedId) {
-      throw new Error("Please enter a product ID.");
-    }
-
-    const response = await getProductPrices(normalizedId);
-    setResult(response);
-    return response;
-  }
-
-  async function handleSearch(event) {
-    event.preventDefault();
-
-    if (loading || !productId.trim()) return;
-
-    setLoading(true);
-    setError("");
-    setNotice("");
-    setEditingPrice(null);
-
-    try {
-      await loadPrices(productId);
-    } catch (err) {
-      setError(err.message || "Unable to load pricing records.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handlePriceSaved(updateResult) {
-    setEditingPrice(null);
-
-    try {
-      await loadPrices(productId);
-      setNotice("Price updated successfully.");
-    } catch (err) {
-      setNotice(
-        err.message ||
-          "Price saved, but pricing details could not be refreshed."
-      );
-    } finally {
-      // Notify Dashboard so the catalogue reloads immediately.
-      onPriceUpdated?.(updateResult?.updated_record);
-    }
-  }
-
-  const cellStyle = {
-    textAlign: "left",
-    padding: "12px 10px",
-    borderBottom: "1px solid #e5e7eb",
-    verticalAlign: "top",
+    fontSize: 14,
   };
 
   const buttonStyle = {
-    padding: "8px 12px",
-    border: 0,
-    borderRadius: 7,
-    background: "#2563eb",
+    padding: "10px 16px",
+    border: "none",
+    borderRadius: 8,
+    background: "#2457e6",
     color: "#ffffff",
-    cursor: "pointer",
     fontWeight: 600,
-    fontSize: 12,
-    whiteSpace: "nowrap",
+    cursor: saving ? "wait" : "pointer",
+    opacity: saving ? 0.7 : 1,
   };
-
-  const prices = result?.data ?? [];
 
   return (
     <section
       style={{
-        background: "var(--card-bg, #ffffff)",
-        color: "var(--text-color, #172033)",
-        border: "1px solid var(--border-color, #e5e7eb)",
-        borderRadius: 12,
-        padding: 20,
         marginTop: 20,
-        overflowX: "auto",
+        padding: 20,
+        border: "1px solid #e2e8f0",
+        borderRadius: 12,
+        background: "#ffffff",
       }}
     >
-      <h2 style={{ marginTop: 0 }}>Product Pricing</h2>
+      <h2 style={{ margin: 0 }}>Edit Product Prices</h2>
 
-      <p style={{ color: "#64748b", marginTop: 4 }}>
-        Search and edit existing product prices.
+      <p style={{ color: "#64748b", marginTop: 6 }}>
+        Update only MRP or Dealer Price in the Product Master workbook.
       </p>
 
-      <form
-        onSubmit={handleSearch}
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 10,
-          alignItems: "center",
-        }}
-      >
-        <input
-          aria-label="Product ID"
-          value={productId}
-          onChange={(event) => setProductId(event.target.value)}
-          placeholder="e.g. PRD000001"
-          required
-          style={{
-            padding: "10px 12px",
-            border: "1px solid #cbd5e1",
-            borderRadius: 8,
-            minWidth: 220,
-            fontSize: 14,
-          }}
-        />
+      {loadingProducts ? (
+        <p>Loading products...</p>
+      ) : loadError ? (
+        <div role="alert" style={{ color: "#b91c1c" }}>
+          {loadError}
+          <button
+            type="button"
+            onClick={loadProducts}
+            style={{ ...buttonStyle, marginLeft: 10 }}
+          >
+            Retry
+          </button>
+        </div>
+      ) : (
+        <>
+          <label
+            style={{
+              display: "block",
+              fontSize: 13,
+              fontWeight: 600,
+              marginBottom: 6,
+            }}
+          >
+            Search product by code, model, brand or category
+          </label>
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={buttonStyle}
-        >
-          {loading ? "Searching..." : "Find Prices"}
-        </button>
-      </form>
+          <input
+            style={inputStyle}
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setSelectedCode("");
+              setError("");
+              setNotice("");
+            }}
+            placeholder="e.g. P00001 or FDM0-DMWATER-5L"
+          />
 
-      {error && (
-        <p role="alert" style={{ color: "#b91c1c", marginTop: 16 }}>
-          {error}
-        </p>
-      )}
-
-      {notice && (
-        <p
-          role="status"
-          style={{
-            marginTop: 16,
-            padding: 12,
-            borderRadius: 8,
-            background: "#eff6ff",
-            color: "#1d4ed8",
-            fontSize: 13,
-          }}
-        >
-          {notice}
-        </p>
-      )}
-
-      {result && (
-        <div style={{ marginTop: 18 }}>
-          <p>
-            <strong>Product ID:</strong>{" "}
-            {result.filters?.productId || productId}
-            {" · "}
-            <strong>Price records:</strong> {prices.length}
-          </p>
-
-          {prices.length === 0 ? (
-            <p>No pricing records found for this product ID.</p>
-          ) : (
-            <table
+          {search.trim() && !selectedProduct && (
+            <div
               style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                marginTop: 16,
-                fontSize: 13,
-                minWidth: 900,
+                marginTop: 6,
+                border: "1px solid #e2e8f0",
+                borderRadius: 8,
+                maxHeight: 220,
+                overflowY: "auto",
               }}
             >
-              <thead>
-                <tr>
-                  {[
-                    "Price Type",
-                    "Source Label",
-                    "Price",
-                    "Basic Price",
-                    "GST Rate",
-                    "GST Amount",
-                    "Price Excl. GST",
-                    "Price Incl. GST",
-                    "Actions",
-                  ].map((heading) => (
-                    <th
-                      key={heading}
-                      style={{ ...cellStyle, whiteSpace: "nowrap" }}
-                    >
-                      {heading}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+              {matchingProducts.slice(0, 10).map((product) => (
+                <button
+                  key={getCode(product)}
+                  type="button"
+                  onClick={() => selectProduct(product)}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    textAlign: "left",
+                    padding: 10,
+                    border: "none",
+                    borderBottom: "1px solid #f1f5f9",
+                    background: "#ffffff",
+                    cursor: "pointer",
+                    color: "#172033",
+                  }}
+                >
+                  <strong>{getCode(product)}</strong>
+                  {" — "}
+                  {product["Model / SKU"] ?? product.product_name ?? "Unnamed product"}
+                  <div style={{ fontSize: 12, color: "#64748b" }}>
+                    {product["Brand"] ?? product.brand ?? "—"} ·{" "}
+                    {product["Category"] ?? product.category ?? "—"}
+                  </div>
+                </button>
+              ))}
 
-              <tbody>
-                {prices.map((price) => {
-                  const isEditing =
-                    editingPrice?.product_price_id ===
-                    price.product_price_id;
-
-                  return (
-                    <tr key={price.product_price_id}>
-                      <td style={cellStyle}>
-                        {price.price_type || "—"}
-                      </td>
-
-                      <td style={cellStyle}>
-                        {price.source_price_label || "—"}
-                      </td>
-
-                      <td style={cellStyle}>
-                        {formatINR(price.source_price_value)}
-                      </td>
-
-                      <td style={cellStyle}>
-                        {formatINR(price.basic_price)}
-                      </td>
-
-                      <td style={cellStyle}>
-                        {price.gst_rate_percent == null
-                          ? "—"
-                          : `${price.gst_rate_percent}%`}
-                      </td>
-
-                      <td style={cellStyle}>
-                        {formatINR(price.gst_amount)}
-                      </td>
-
-                      <td style={cellStyle}>
-                        {formatINR(price.price_excluding_gst)}
-                      </td>
-
-                      <td style={cellStyle}>
-                        {formatINR(price.price_including_gst)}
-                      </td>
-
-                      <td style={cellStyle}>
-                        <button
-                          type="button"
-                          style={{
-                            ...buttonStyle,
-                            background: isEditing ? "#475569" : "#2563eb",
-                          }}
-                          onClick={() => {
-                            setNotice("");
-                            setError("");
-                            setEditingPrice(isEditing ? null : price);
-                          }}
-                          disabled={Boolean(editingPrice) && !isEditing}
-                        >
-                          {isEditing ? "Close Editor" : "Edit Price"}
-                        </button>
-
-                        {isEditing && (
-                          <EditPriceForm
-                            key={price.product_price_id}
-                            price={price}
-                            onCancel={() => setEditingPrice(null)}
-                            onSaved={handlePriceSaved}
-                          />
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+              {matchingProducts.length === 0 && (
+                <p style={{ padding: 10, margin: 0 }}>
+                  No matching products found.
+                </p>
+              )}
+            </div>
           )}
-        </div>
+
+          {selectedProduct && (
+            <div
+              style={{
+                marginTop: 16,
+                padding: 14,
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: 10,
+              }}
+            >
+              <h3 style={{ margin: "0 0 6px" }}>
+                {selectedProduct["Model / SKU"] ??
+                  selectedProduct.product_name ??
+                  selectedCode}
+              </h3>
+
+              <p style={{ margin: "0 0 12px", color: "#64748b" }}>
+                Product Code: <strong>{selectedCode}</strong>
+                {" · "}
+                {selectedProduct["Brand"] ?? selectedProduct.brand ?? "—"}
+              </p>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: 12,
+                  marginBottom: 16,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>Current MRP</div>
+                  <strong>{formatINR(getPrice(selectedProduct, "MRP"))}</strong>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>
+                    Current Dealer Price
+                  </div>
+                  <strong>
+                    {formatINR(getPrice(selectedProduct, "Dealer Price"))}
+                  </strong>
+                </div>
+              </div>
+
+              <form onSubmit={handleSubmit}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginBottom: 6,
+                  }}
+                >
+                  Price field to edit
+                </label>
+
+                <select
+                  style={{ ...inputStyle, marginBottom: 12 }}
+                  value={editingField}
+                  onChange={(event) => changeField(event.target.value)}
+                >
+                  {PRICE_FIELDS.map((field) => (
+                    <option key={field} value={field}>
+                      {field}
+                    </option>
+                  ))}
+                </select>
+
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginBottom: 6,
+                  }}
+                >
+                  New {editingField}
+                </label>
+
+                <input
+                  style={inputStyle}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={newValue}
+                  onChange={(event) => setNewValue(event.target.value)}
+                  placeholder="Enter price, or leave blank to clear it"
+                />
+
+                <p style={{ fontSize: 12, color: "#64748b" }}>
+                  Leave blank only if you intend to clear this price. No GST,
+                  discount or other price is calculated automatically.
+                </p>
+
+                {error && (
+                  <p role="alert" style={{ color: "#b91c1c" }}>
+                    {error}
+                  </p>
+                )}
+
+                {notice && (
+                  <p role="status" style={{ color: "#166534" }}>
+                    {notice}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  style={buttonStyle}
+                >
+                  {saving ? "Saving..." : `Save ${editingField}`}
+                </button>
+              </form>
+            </div>
+          )}
+        </>
       )}
     </section>
   );
