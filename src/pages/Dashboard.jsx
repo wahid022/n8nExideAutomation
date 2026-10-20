@@ -227,7 +227,29 @@ export default function Dashboard({ activePage = "Dashboard", onNavigate = () =>
       <Sidebar activePage={activePage} onNavigate={onNavigate} />
 
       <div className="main-area">
-        <Topbar search={search} onSearch={handleSearch} />
+        <Topbar />
+
+        <div className="dashboard-search-toolbar no-print">
+          <div className="search-toolbar-label">Product catalogue</div>
+          <div className="global-search">
+            <span className="search-icon" aria-hidden="true">⌕</span>
+            <input
+              value={search}
+              onChange={(event) => handleSearch(event.target.value)}
+              placeholder="Search product name, model, code..."
+              aria-label="Search products"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => handleSearch("")}
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
 
         <main className="page-content">
           <div className="page-heading">

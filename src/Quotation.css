@@ -1,4212 +1,1810 @@
 
 
-
-
 /* ==========================================
-
-
 
    Bharat Batteries — Colourful quotation UI
 
-
-
    ========================================== */
-
-
-
-
-
-
 
 .quotation-area {
 
-
-
   --quote-blue: #1d4ed8;
-
-
 
   --quote-blue-dark: #1e3a8a;
 
-
-
   --quote-teal: #0d9488;
-
-
 
   --quote-light-blue: #eff6ff;
 
-
-
   --quote-light-teal: #f0fdfa;
-
-
 
   --quote-border: #dbe5f4;
 
-
-
 }
 
-
-
-
-
-
-
 .quotation-content {
-
-
 
   background:
 
-
-
     radial-gradient(ellipse at top right, #dbeafe 0, transparent 38%),
-
-
 
     #f6f8fc;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-heading h1 {
 
-
-
   color: #172554;
-
-
 
   letter-spacing: -0.035em;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-heading > div > p {
 
-
-
   color: #64748b;
-
-
 
 }
 
-
-
-
-
-
-
 .quotation-area .quote-panel {
-
-
 
   border: 1px solid var(--quote-border);
 
-
-
   border-radius: 16px;
-
-
 
   box-shadow: 0 5px 18px rgba(30, 64, 175, 0.045);
 
-
-
   transition:
-
-
 
     box-shadow 180ms ease,
 
-
-
     border-color 180ms ease;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-panel:focus-within {
 
-
-
   border-color: #93c5fd;
-
-
 
   box-shadow: 0 7px 24px rgba(37, 99, 235, 0.09);
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-section-title h2 {
 
-
-
   color: #172554;
-
-
 
 }
 
-
-
-
-
-
-
 .quotation-area .step-number {
-
-
 
   background: linear-gradient(135deg, #2563eb, #0891b2);
 
-
-
   color: #ffffff;
 
-
-
   border-radius: 10px;
-
-
 
   box-shadow: 0 4px 10px rgba(37, 99, 235, 0.17);
 
-
-
 }
-
-
-
-
-
-
 
 .supplier-panel {
 
-
-
   border-top: 4px solid #2563eb !important;
-
-
 
   background: linear-gradient(140deg, #ffffff 0%, #eff6ff 100%);
 
-
-
 }
-
-
-
-
-
-
 
 .supplier-panel .step-number {
 
-
-
   background: linear-gradient(135deg, #0d9488, #0f766e);
-
-
 
 }
 
-
-
-
-
-
-
 .quotation-area .quote-form-grid input,
-
-
 
 .quotation-area .quote-form-grid textarea,
 
-
-
 .quotation-area .quote-search input,
-
-
 
 .quotation-area .quote-item-controls input {
 
-
-
   border: 1px solid #cbd5e1;
-
-
 
   border-radius: 9px;
 
-
-
   background: #ffffff;
-
-
 
   color: #0f172a;
 
-
-
   transition:
-
-
 
     border-color 150ms ease,
 
-
-
     box-shadow 150ms ease;
-
-
 
 }
 
-
-
-
-
-
-
 .quotation-area .quote-form-grid input:focus,
-
-
 
 .quotation-area .quote-form-grid textarea:focus,
 
-
-
 .quotation-area .quote-search input:focus,
-
-
 
 .quotation-area .quote-item-controls input:focus {
 
-
-
   outline: none;
-
-
 
   border-color: #2563eb;
 
-
-
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-search {
 
-
-
   border: 1px solid #bfdbfe;
-
-
 
   border-radius: 12px;
 
-
-
   background: #ffffff;
-
-
 
 }
 
-
-
-
-
-
-
 .quotation-area .quote-product-result {
-
-
 
   border: 1px solid #e2e8f0;
 
-
-
   border-radius: 11px;
-
-
 
   margin-top: 8px;
 
-
-
   padding: 13px;
 
-
-
   transition:
-
-
 
     background 150ms ease,
 
-
-
     border-color 150ms ease,
-
-
 
     transform 150ms ease;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-product-result:hover {
 
-
-
   background: #eff6ff;
-
-
 
   border-color: #93c5fd;
 
-
-
   transform: translateY(-1px);
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-product-price {
 
-
-
   color: #1d4ed8;
-
-
 
   font-weight: 750;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .primary-button {
 
-
-
   background: linear-gradient(135deg, #2563eb, #1d4ed8);
-
-
 
   border: 0;
 
-
-
   border-radius: 9px;
-
-
 
   color: #ffffff;
 
-
-
   font-weight: 700;
-
-
 
   transition:
 
-
-
     filter 150ms ease,
-
-
 
     transform 150ms ease,
 
-
-
     box-shadow 150ms ease;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .primary-button:hover:not(:disabled) {
 
-
-
   filter: brightness(1.07);
-
-
 
   transform: translateY(-1px);
 
-
-
   box-shadow: 0 5px 14px rgba(37, 99, 235, 0.22);
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .primary-button:disabled {
 
-
-
   cursor: not-allowed;
-
-
 
   opacity: 0.55;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .secondary-button {
 
-
-
   border-radius: 9px;
-
-
 
   border: 1px solid #bfdbfe;
 
-
-
   background: #ffffff;
 
-
-
   color: #1d4ed8;
-
-
 
   font-weight: 650;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-item-card {
 
-
-
   border: 1px solid #dbeafe;
-
-
 
   border-left: 4px solid #0d9488;
 
-
-
   border-radius: 12px;
-
-
 
   background: linear-gradient(135deg, #ffffff, #f8fbff);
 
-
-
   padding: 15px;
-
-
 
   margin-bottom: 12px;
 
-
-
 }
 
-
-
-
-
-
-
 .quotation-area .quote-item-head {
-
-
 
   padding-bottom: 12px;
 
-
-
   border-bottom: 1px solid #e2e8f0;
-
-
 
 }
 
-
-
-
-
-
-
 .quotation-area .quote-item-controls > div {
-
-
 
   background: #f1f5f9;
 
-
-
   border-radius: 8px;
-
-
 
   padding: 9px;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-item-controls > div strong {
 
-
-
   color: #1e40af;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .item-count {
 
-
-
   display: inline-flex;
 
-
-
   align-items: center;
-
-
 
   border-radius: 999px;
 
-
-
   padding: 4px 9px;
-
-
 
   background: #dbeafe;
 
-
-
   color: #1d4ed8;
-
-
 
   font-size: 12px;
 
-
-
   font-weight: 750;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-actions {
 
-
-
   display: flex;
-
-
 
   flex-wrap: wrap;
 
-
-
   justify-content: flex-end;
-
-
 
   gap: 12px;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .generate-button {
 
-
-
   padding: 12px 20px;
-
-
 
   background: linear-gradient(120deg, #1d4ed8, #0d9488);
 
-
-
   box-shadow: 0 5px 16px rgba(29, 78, 216, 0.15);
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-alert {
 
-
-
   border: 1px solid #bfdbfe;
-
-
 
   border-left: 4px solid #2563eb;
 
-
-
   border-radius: 9px;
-
-
 
   background: #eff6ff;
 
-
-
   color: #1e40af;
-
-
 
   padding: 12px 15px;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-alert.error {
 
-
-
   border-color: #fecaca;
-
-
 
   border-left-color: #dc2626;
 
-
-
   background: #fef2f2;
-
-
 
   color: #991b1b;
 
-
-
 }
-
-
-
-
-
-
 
 /* ==========================================
 
-
-
    Customer-facing quotation preview / PDF
-
-
 
    ========================================== */
 
-
-
-
-
-
-
 .quote-document {
-
-
 
   overflow: hidden;
 
-
-
   border: 1px solid #dbeafe;
-
-
 
   border-radius: 14px;
 
-
-
   background: #ffffff;
-
-
 
   box-shadow: 0 12px 34px rgba(30, 64, 175, 0.09);
 
-
-
   color: #1e293b;
 
-
-
 }
-
-
-
-
-
-
 
 .document-brand {
 
-
-
   display: flex;
-
-
 
   align-items: center;
 
-
-
   gap: 12px;
-
-
 
   padding: 22px 18px;
 
-
-
   background: linear-gradient(120deg, #1e40af 0%, #2563eb 58%, #0891b2 100%);
-
-
 
   color: #ffffff;
 
-
-
 }
-
-
-
-
-
-
 
 .document-mark {
 
-
-
   display: grid;
 
-
-
   flex-shrink: 0;
-
-
 
   place-items: center;
 
-
-
   width: 42px;
-
-
 
   height: 42px;
 
-
-
   border-radius: 11px;
-
-
 
   background: #ffffff;
 
-
-
   color: #1d4ed8;
-
-
 
   font-size: 16px;
 
-
-
   font-weight: 900;
 
-
-
 }
-
-
-
-
-
-
 
 .document-company {
 
-
-
   display: flex;
-
-
 
   flex: 1;
 
-
-
   min-width: 0;
-
-
 
   flex-direction: column;
 
-
-
   gap: 4px;
 
-
-
 }
-
-
-
-
-
-
 
 .document-company strong {
 
-
-
   font-size: 15px;
-
-
 
   letter-spacing: 0.035em;
 
-
-
 }
-
-
-
-
-
-
 
 .document-company span {
 
-
-
   font-size: 10px;
-
-
 
   line-height: 1.5;
 
-
-
   overflow-wrap: anywhere;
 
-
-
 }
-
-
-
-
-
-
 
 .document-quotation-label {
 
-
-
   align-self: flex-start;
-
-
 
   color: #ffffff;
 
-
-
   font-size: 12px;
-
-
 
   font-weight: 850;
 
-
-
   letter-spacing: 0.1em;
 
-
-
 }
-
-
-
-
-
-
 
 .document-meta {
 
-
-
   display: grid;
-
-
 
   grid-template-columns: repeat(3, minmax(0, 1fr));
 
-
-
   gap: 10px;
-
-
 
   padding: 15px 16px;
 
-
-
   border-bottom: 1px solid #dbeafe;
-
-
 
   background: #eff6ff;
 
-
-
 }
-
-
-
-
-
-
 
 .document-meta > div {
 
-
-
   display: flex;
-
-
 
   min-width: 0;
 
-
-
   flex-direction: column;
-
-
 
   gap: 5px;
 
-
-
 }
-
-
-
-
-
-
 
 .document-meta span,
 
-
-
 .document-customer > span {
-
-
 
   color: #64748b;
 
-
-
   font-size: 9px;
 
-
-
   font-weight: 800;
-
-
 
   letter-spacing: 0.045em;
 
-
-
 }
-
-
-
-
-
-
 
 .document-meta strong {
 
-
-
   overflow-wrap: anywhere;
-
-
 
   color: #1e3a8a;
 
-
-
   font-size: 11px;
 
-
-
 }
-
-
-
-
-
-
 
 .document-customer {
 
-
-
   margin: 16px;
-
-
 
   padding: 14px;
 
-
-
   border: 1px solid #ccfbf1;
-
-
 
   border-left: 4px solid #0d9488;
 
-
-
   border-radius: 10px;
-
-
 
   background: #f0fdfa;
 
-
-
 }
-
-
-
-
-
-
 
 .document-customer > span,
 
-
-
 .document-customer > strong {
 
-
-
   display: block;
-
-
 
   margin-bottom: 6px;
 
-
-
 }
-
-
-
-
-
-
 
 .document-customer > strong {
 
-
-
   color: #134e4a;
-
-
 
   font-size: 13px;
 
-
-
 }
-
-
-
-
-
-
 
 .document-customer p {
 
-
-
   margin: 4px 0;
-
-
 
   color: #475569;
 
-
-
   font-size: 10px;
-
-
 
   overflow-wrap: anywhere;
 
-
-
 }
-
-
-
-
-
-
 
 .document-supplier-terms {
 
-
-
   display: grid;
-
-
 
   grid-template-columns: repeat(2, minmax(0, 1fr));
 
-
-
   gap: 10px;
-
-
 
   margin: 16px;
 
-
-
 }
-
-
-
-
-
-
 
 .document-supplier-terms > div {
 
-
-
   display: flex;
-
-
 
   min-width: 0;
 
-
-
   flex-direction: column;
 
-
-
   gap: 5px;
-
-
 
   padding: 11px;
 
-
-
   border: 1px solid #ccfbf1;
 
-
-
   border-radius: 9px;
-
-
 
   background: #f0fdfa;
 
-
-
 }
-
-
-
-
-
-
 
 .document-supplier-terms strong {
 
-
-
   color: #0f766e;
-
-
 
   font-size: 10px;
 
-
-
 }
-
-
-
-
-
-
 
 .document-supplier-terms span {
 
-
-
   color: #475569;
-
-
 
   font-size: 10px;
 
-
-
   overflow-wrap: anywhere;
 
-
-
 }
-
-
-
-
-
-
 
 .document-table-wrap {
 
-
-
   width: 100%;
-
-
 
   overflow-x: auto;
 
-
-
 }
-
-
-
-
-
-
 
 .document-table {
 
-
-
   width: 100%;
-
-
 
   border-collapse: collapse;
 
-
-
   font-size: 10px;
 
-
-
 }
-
-
-
-
-
-
 
 .document-table thead {
 
-
-
   background: #1e40af;
-
-
 
   color: #ffffff;
 
-
-
 }
-
-
-
-
-
-
 
 .document-table th {
 
-
-
   padding: 11px 8px;
-
-
 
   text-align: left;
 
-
-
   font-weight: 750;
 
-
-
 }
-
-
-
-
-
-
 
 .document-table td {
 
-
-
   padding: 11px 8px;
-
-
 
   border-bottom: 1px solid #e2e8f0;
 
-
-
   vertical-align: top;
 
-
-
 }
-
-
-
-
-
-
 
 .document-table tbody tr:nth-child(even) {
 
-
-
   background: #f8fafc;
 
-
-
 }
-
-
-
-
-
-
 
 .document-table td strong,
 
-
-
 .document-table td small {
-
-
 
   display: block;
 
-
-
 }
-
-
-
-
-
-
 
 .document-table td strong {
 
-
-
   color: #1e293b;
-
-
 
   font-size: 10px;
 
-
-
 }
-
-
-
-
-
-
 
 .document-table td small {
 
-
-
   margin-top: 4px;
 
-
-
   color: #64748b;
-
-
 
   font-size: 9px;
 
-
-
 }
-
-
-
-
-
-
 
 .document-table .align-right {
 
-
-
   text-align: right;
-
-
 
   white-space: nowrap;
 
-
-
 }
-
-
-
-
-
-
 
 .document-empty {
 
-
-
   padding: 24px 8px !important;
-
-
 
   color: #94a3b8;
 
-
-
   text-align: center;
 
-
-
 }
-
-
-
-
-
-
 
 .document-totals {
 
-
-
   display: flex;
-
-
 
   flex-direction: column;
 
-
-
   gap: 10px;
 
-
-
   margin: 16px;
-
-
 
   padding: 14px;
 
-
-
   border-radius: 10px;
-
-
 
   background: #f8fafc;
 
-
-
 }
-
-
-
-
-
-
 
 .document-totals > div {
 
-
-
   display: flex;
-
-
 
   align-items: center;
 
-
-
   justify-content: space-between;
-
-
 
   gap: 12px;
 
-
-
   color: #64748b;
-
-
 
   font-size: 11px;
 
-
-
 }
-
-
-
-
-
-
 
 .document-totals > div strong {
 
-
-
   color: #1e293b;
-
-
 
   text-align: right;
 
-
-
 }
-
-
-
-
-
-
 
 .document-totals .document-grand {
 
-
-
   margin-top: 3px;
-
-
 
   padding: 13px;
 
-
-
   border-radius: 9px;
-
-
 
   background: #dbeafe;
 
-
-
   color: #1d4ed8;
-
-
 
   font-size: 13px;
 
-
-
   font-weight: 800;
 
-
-
 }
-
-
-
-
-
-
 
 .document-totals .document-grand strong {
 
-
-
   color: #1d4ed8;
-
-
 
   font-size: 15px;
 
-
-
 }
-
-
-
-
-
-
 
 .document-warning {
 
-
-
   margin: 0;
-
-
 
   color: #b45309;
 
-
-
   font-size: 10px;
 
-
-
 }
-
-
-
-
-
-
 
 .document-terms {
 
-
-
   margin: 16px;
-
-
 
   padding-top: 13px;
 
-
-
   border-top: 1px solid #dbeafe;
 
-
-
 }
-
-
-
-
-
-
 
 .document-terms > strong {
 
-
-
   color: #1e40af;
-
-
 
   font-size: 11px;
 
-
-
 }
-
-
-
-
-
-
 
 .document-terms p {
 
-
-
   margin: 7px 0;
-
-
 
   color: #64748b;
 
-
-
   font-size: 10px;
-
-
 
   line-height: 1.7;
 
-
-
   white-space: pre-wrap;
-
-
 
   overflow-wrap: anywhere;
 
-
-
 }
-
-
-
-
-
-
 
 .document-signature {
 
-
-
   display: flex;
-
-
 
   align-items: flex-end;
 
-
-
   flex-direction: column;
 
-
-
   gap: 7px;
-
-
 
   margin: 30px 16px 20px;
 
-
-
   color: #475569;
-
-
 
   font-size: 10px;
 
-
-
 }
-
-
-
-
-
-
 
 .signature-line {
 
-
-
   width: 125px;
-
-
 
   margin-top: 25px;
 
-
-
   border-top: 1px solid #64748b;
 
-
-
 }
-
-
-
-
-
-
 
 .document-signature strong {
 
-
-
   color: #1e293b;
-
-
 
   font-size: 10px;
 
-
-
 }
-
-
-
-
-
-
 
 .document-footer {
 
-
-
   padding: 13px 10px;
-
-
 
   border-top: 1px solid #dbeafe;
 
-
-
   background: #eff6ff;
-
-
 
   color: #475569;
 
-
-
   font-size: 10px;
-
-
 
   text-align: center;
 
-
-
 }
-
-
-
-
-
-
 
 .preview-live {
 
-
-
   color: #0f766e;
 
-
-
 }
-
-
-
-
-
-
 
 .preview-live i {
 
-
-
   background: #10b981;
 
-
-
 }
-
-
-
-
-
-
 
 /* Responsive */
 
-
-
 @media (max-width: 700px) {
-
-
 
   .document-brand {
 
-
-
     flex-wrap: wrap;
 
-
-
   }
-
-
-
-
-
-
 
   .document-quotation-label {
 
-
-
     margin-left: auto;
 
-
-
   }
-
-
-
-
-
-
 
   .document-meta {
 
-
-
     gap: 7px;
-
-
 
     padding: 12px;
 
-
-
   }
-
-
-
-
-
-
 
   .document-meta strong {
 
-
-
     font-size: 10px;
 
-
-
   }
-
-
-
-
-
-
 
   .document-supplier-terms {
 
-
-
     grid-template-columns: 1fr;
-
-
 
   }
 
-
-
-
-
-
-
   .quotation-area .quote-actions {
-
-
 
     justify-content: stretch;
 
-
-
   }
 
-
-
-
-
-
-
   .quotation-area .quote-actions button {
-
-
 
     flex: 1;
 
-
-
   }
 
-
-
 }
-
-
-
-
-
-
 
 /* Print only the customer document, not the editing interface */
 
-
-
 @page {
-
-
 
   size: A4;
 
-
-
   margin: 12mm;
 
-
-
 }
-
-
-
-
-
-
 
 @media print {
 
-
-
   body {
 
-
-
     background: #ffffff !important;
-
-
 
     -webkit-print-color-adjust: exact;
 
-
-
     print-color-adjust: exact;
 
-
-
   }
-
-
-
-
-
-
 
   .no-print,
 
-
-
   .sidebar,
-
-
 
   .topbar,
 
-
-
   .page-heading,
-
-
 
   .quote-main-column,
 
-
-
   .preview-heading,
-
-
 
   .preview-note {
 
-
-
     display: none !important;
 
-
-
   }
-
-
-
-
-
-
 
   .app-layout,
 
-
-
   .main-area,
-
-
 
   .quotation-area,
 
-
-
   .quotation-content,
-
-
 
   .quote-layout,
 
-
-
   .quote-preview-wrap {
-
-
 
     display: block !important;
 
-
-
     width: 100% !important;
-
-
 
     max-width: none !important;
 
-
-
     margin: 0 !important;
-
-
 
     padding: 0 !important;
 
-
-
     border: 0 !important;
-
-
 
     background: #ffffff !important;
 
-
-
     box-shadow: none !important;
 
-
-
   }
-
-
-
-
-
-
 
   .quote-document {
 
-
-
     display: block !important;
 
-
-
     width: 100% !important;
-
-
 
     max-width: none !important;
 
-
-
     margin: 0 !important;
-
-
 
     overflow: visible !important;
 
-
-
     border: 1px solid #dbeafe !important;
-
-
 
     border-radius: 0 !important;
 
-
-
     box-shadow: none !important;
-
-
 
     font-size: 10px;
 
-
-
   }
-
-
-
-
-
-
 
   .document-brand,
 
-
-
   .document-meta,
-
-
 
   .document-customer,
 
-
-
   .document-supplier-terms,
-
-
 
   .document-table thead,
 
-
-
   .document-grand,
-
-
 
   .document-footer {
 
-
-
     -webkit-print-color-adjust: exact !important;
-
-
 
     print-color-adjust: exact !important;
 
-
-
   }
-
-
-
-
-
-
 
   .document-table {
 
-
-
     width: 100% !important;
-
-
 
     font-size: 9px !important;
 
-
-
   }
-
-
-
-
-
-
 
   .document-table tr {
 
-
-
     break-inside: avoid;
 
-
-
   }
-
-
-
-
-
-
 
   .document-totals,
 
-
-
   .document-terms,
-
-
 
   .document-signature {
 
-
-
     break-inside: avoid;
 
-
-
   }
-
-
-
-
-
-
 
   /* Internal margin controls must never appear in the customer PDF. */
 
-
-
   .quote-item-controls label.no-print {
-
-
 
     display: none !important;
 
-
-
   }
 
-
-
 }
-
-
-
-
-
-
 
 /* =========================================
 
-
-
    FIX: Quotation form and product layout
-
-
 
    Add this at the END of Quotation.css
 
-
-
    ========================================= */
-
-
-
-
-
-
 
 /* Main page spacing */
 
-
-
 .quotation-content {
-
-
 
   padding: 28px;
 
-
-
   background: #f4f7fc;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-heading {
 
-
-
   margin-bottom: 24px;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-heading h1 {
 
-
-
   margin: 6px 0;
-
-
 
   font-size: 30px;
 
-
-
   font-weight: 800;
-
-
 
   color: #172554;
 
-
-
 }
-
-
-
-
-
-
 
 /* Separate, spacious form cards */
 
-
-
 .quotation-area .quote-panel {
-
-
 
   display: block;
 
-
-
   width: 100%;
 
-
-
   min-width: 0;
-
-
 
   padding: 24px;
 
-
-
   margin-bottom: 20px;
-
-
 
   overflow: visible;
 
-
-
   border: 1px solid #dbe5f4;
-
-
 
   border-radius: 16px;
 
-
-
   background: #ffffff;
-
-
 
   box-shadow: 0 5px 18px rgba(30, 64, 175, 0.05);
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .supplier-panel {
 
-
-
   border-top: 4px solid #2563eb;
-
-
 
   background: linear-gradient(135deg, #ffffff, #f0f7ff);
 
-
-
 }
-
-
-
-
-
-
 
 /* Section headings */
 
-
-
 .quotation-area .quote-section-title {
-
-
 
   display: flex;
 
-
-
   align-items: flex-start;
 
-
-
   gap: 14px;
-
-
 
   margin-bottom: 24px;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-section-title > div {
 
-
-
   flex: 1;
-
-
 
   min-width: 0;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-section-title h2 {
 
-
-
   margin: 0 0 6px;
-
-
 
   font-size: 18px;
 
-
-
   line-height: 1.4;
-
-
 
   font-weight: 750;
 
-
-
   color: #172554;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-section-title p {
 
-
-
   margin: 0;
-
-
 
   color: #64748b;
 
-
-
   font-size: 13px;
-
-
 
   line-height: 1.6;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .step-number {
 
-
-
   display: inline-flex;
-
-
 
   flex-shrink: 0;
 
-
-
   align-items: center;
 
-
-
   justify-content: center;
-
-
 
   width: 36px;
 
-
-
   height: 36px;
 
-
-
   border-radius: 11px;
-
-
 
   background: linear-gradient(135deg, #2563eb, #0891b2);
 
-
-
   color: #ffffff;
-
-
 
   font-size: 14px;
 
-
-
   font-weight: 800;
 
-
-
 }
-
-
-
-
-
-
 
 /* CRITICAL FIX: Labels above inputs */
 
-
-
 .quotation-area .quote-form-grid {
 
-
-
   display: grid !important;
-
-
 
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 
-
-
   gap: 20px 24px !important;
 
-
-
   width: 100%;
-
-
 
   align-items: start;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-form-grid > label {
 
-
-
   display: flex !important;
 
-
-
   flex-direction: column !important;
-
-
 
   align-items: stretch !important;
 
-
-
   justify-content: flex-start;
-
-
 
   gap: 8px;
 
-
-
   width: 100%;
-
-
 
   min-width: 0;
 
-
-
   margin: 0;
-
-
 
   color: #334155;
 
-
-
   font-size: 12px;
 
-
-
   line-height: 1.5;
-
-
 
   font-weight: 700;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-form-grid > label.full-width {
 
-
-
   grid-column: 1 / -1;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-form-grid input,
 
-
-
 .quotation-area .quote-form-grid textarea {
-
-
 
   display: block !important;
 
-
-
   box-sizing: border-box !important;
-
-
 
   width: 100% !important;
 
-
-
   min-width: 0;
-
-
 
   min-height: 44px;
 
-
-
   margin: 0;
-
-
 
   padding: 11px 13px;
 
-
-
   border: 1px solid #cbd5e1;
-
-
 
   border-radius: 9px;
 
-
-
   background: #ffffff;
-
-
 
   color: #0f172a;
 
-
-
   font: inherit;
-
-
 
   font-size: 13px;
 
-
-
   line-height: 1.5;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-form-grid textarea {
 
-
-
   min-height: 92px;
-
-
 
   resize: vertical;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-form-grid input:focus,
 
-
-
 .quotation-area .quote-form-grid textarea:focus {
 
-
-
   outline: none;
-
-
 
   border-color: #2563eb;
 
-
-
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 
-
-
 }
-
-
-
-
-
-
 
 /* Product search */
 
-
-
 .quotation-area .quote-search {
 
-
-
   display: flex;
-
-
 
   align-items: center;
 
-
-
   gap: 12px;
-
-
 
   width: 100%;
 
-
-
   min-width: 0;
 
-
-
   box-sizing: border-box;
-
-
 
   padding: 0 14px;
 
-
-
   border: 1px solid #cbd5e1;
-
-
 
   border-radius: 11px;
 
-
-
   background: #ffffff;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-search > span {
 
-
-
   flex-shrink: 0;
-
-
 
   color: #2563eb;
 
-
-
   font-size: 22px;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-search input {
 
-
-
   flex: 1;
-
-
 
   width: 100%;
 
-
-
   min-width: 0;
-
-
 
   min-height: 46px;
 
-
-
   padding: 10px 0;
 
-
-
   border: 0;
-
-
 
   outline: none;
 
-
-
   background: transparent;
-
-
 
   box-shadow: none;
 
-
-
   font-size: 13px;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-search input:focus {
 
-
-
   border: 0;
-
-
 
   box-shadow: none;
 
-
-
 }
-
-
-
-
-
-
 
 /* Product result: details | price | action */
 
-
-
 .quotation-area .quote-product-results {
-
-
 
   display: flex;
 
-
-
   flex-direction: column;
-
-
 
   gap: 10px;
 
-
-
   margin-top: 16px;
-
-
 
   width: 100%;
 
-
-
   min-width: 0;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-product-result {
 
-
-
   display: grid !important;
-
-
 
   grid-template-columns: minmax(0, 1fr) auto auto !important;
 
-
-
   align-items: center !important;
-
-
 
   gap: 18px;
 
-
-
   box-sizing: border-box;
-
-
 
   width: 100%;
 
-
-
   min-width: 0;
-
-
 
   margin: 0;
 
-
-
   padding: 16px;
-
-
 
   border: 1px solid #e2e8f0;
 
-
-
   border-radius: 12px;
 
-
-
   background: #ffffff;
-
-
 
   transition: border-color 160ms ease, background 160ms ease;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-product-result:hover {
 
-
-
   border-color: #93c5fd;
-
-
 
   background: #f8fbff;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-product-info {
 
-
-
   display: flex;
 
-
-
   flex-direction: column;
-
-
 
   gap: 6px;
 
-
-
   min-width: 0;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-product-info strong {
 
-
-
   color: #172554;
-
-
 
   font-size: 13px;
 
-
-
   line-height: 1.5;
-
-
 
   overflow-wrap: anywhere;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-product-info span {
 
-
-
   color: #64748b;
-
-
 
   font-size: 11px;
 
-
-
   line-height: 1.5;
-
-
 
   overflow-wrap: anywhere;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-product-price {
 
-
-
   display: flex;
 
-
-
   flex-direction: column;
-
-
 
   gap: 4px;
 
-
-
   align-items: flex-end;
 
-
-
   white-space: nowrap;
-
-
 
   color: #1d4ed8;
 
-
-
   font-size: 14px;
-
-
 
   font-weight: 800;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-product-price small {
 
-
-
   color: #64748b;
-
-
 
   font-size: 10px;
 
-
-
   font-weight: 500;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .add-button {
 
-
-
   min-width: 78px;
-
-
 
   min-height: 38px;
 
-
-
   padding: 9px 13px;
-
-
 
   white-space: nowrap;
 
-
-
 }
-
-
-
-
-
-
 
 /* Product cards already added to quotation */
 
-
-
 .quotation-area .quote-item-card {
-
-
 
   box-sizing: border-box;
 
-
-
   width: 100%;
 
-
-
   min-width: 0;
-
-
 
   margin-bottom: 14px;
 
-
-
   padding: 18px;
-
-
 
   border: 1px solid #dbe5f4;
 
-
-
   border-left: 4px solid #0d9488;
-
-
 
   border-radius: 12px;
 
-
-
   background: #ffffff;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-item-head {
 
-
-
   display: flex;
-
-
 
   align-items: flex-start;
 
-
-
   justify-content: space-between;
-
-
 
   gap: 12px;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-item-head > div {
 
-
-
   display: flex;
-
-
 
   flex: 1;
 
-
-
   flex-direction: column;
-
-
 
   gap: 5px;
 
-
-
   min-width: 0;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-item-head strong {
 
-
-
   overflow-wrap: anywhere;
-
-
 
   line-height: 1.5;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-item-controls {
 
-
-
   display: grid;
-
-
 
   grid-template-columns: repeat(3, minmax(0, 1fr));
 
-
-
   gap: 14px;
-
-
 
   margin-top: 18px;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-item-controls > label {
 
-
-
   display: flex !important;
-
-
 
   flex-direction: column !important;
 
-
-
   gap: 7px;
-
-
 
   min-width: 0;
 
-
-
   color: #64748b;
-
-
 
   font-size: 12px;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-item-controls input {
 
-
-
   box-sizing: border-box;
-
-
 
   width: 100%;
 
-
-
   min-width: 0;
-
-
 
   min-height: 40px;
 
-
-
   padding: 8px 10px;
-
-
 
   border: 1px solid #cbd5e1;
 
-
-
   border-radius: 8px;
-
-
 
   background: #ffffff;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-item-controls > div {
 
-
-
   display: flex;
-
-
 
   flex-direction: column;
 
-
-
   justify-content: center;
-
-
 
   gap: 7px;
 
-
-
   min-width: 0;
-
-
 
   padding: 12px;
 
-
-
   border: 1px solid #e2e8f0;
-
-
 
   border-radius: 9px;
 
-
-
   background: #f8fafc;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-item-controls > div span {
 
-
-
   color: #64748b;
-
-
 
   font-size: 11px;
 
-
-
   line-height: 1.5;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-item-controls > div strong {
 
-
-
   color: #1e40af;
-
-
 
   font-size: 13px;
 
-
-
   overflow-wrap: anywhere;
 
-
-
 }
-
-
-
-
-
-
 
 /* Buttons */
 
-
-
 .quotation-area .quote-actions {
-
-
 
   display: flex;
 
-
-
   flex-wrap: wrap;
-
-
 
   justify-content: flex-end;
 
-
-
   gap: 12px;
-
-
 
   margin-top: 8px;
 
-
-
 }
-
-
-
-
-
-
 
 .quotation-area .quote-actions button {
 
-
-
   min-height: 44px;
-
-
 
   padding: 12px 18px;
 
-
-
 }
-
-
-
-
-
-
 
 /* Responsive tablet */
 
-
-
 @media (max-width: 1000px) {
 
-
-
   .quotation-content {
-
-
 
     padding: 22px;
 
-
-
   }
 
-
-
-
-
-
-
   .quotation-area .quote-item-controls {
-
-
 
     grid-template-columns: repeat(2, minmax(0, 1fr));
 
-
-
   }
 
-
-
 }
-
-
-
-
-
-
 
 /* Responsive mobile */
 
-
-
 @media (max-width: 600px) {
-
-
 
   .quotation-content {
 
-
-
     padding: 14px;
 
-
-
   }
-
-
-
-
-
-
 
   .quotation-heading h1 {
 
-
-
     font-size: 25px;
 
-
-
   }
-
-
-
-
-
-
 
   .quotation-area .quote-panel {
 
-
-
     padding: 17px;
-
-
 
     border-radius: 13px;
 
-
-
   }
-
-
-
-
-
-
 
   .quotation-area .quote-form-grid {
 
-
-
     grid-template-columns: minmax(0, 1fr) !important;
-
-
 
     gap: 17px !important;
 
-
-
   }
-
-
-
-
-
-
 
   .quotation-area .quote-form-grid > label.full-width {
 
-
-
     grid-column: auto;
 
-
-
   }
-
-
-
-
-
-
 
   .quotation-area .quote-product-result {
 
-
-
     grid-template-columns: minmax(0, 1fr) auto !important;
-
-
 
     gap: 12px;
 
-
-
     padding: 13px;
 
-
-
   }
-
-
-
-
-
-
 
   .quotation-area .quote-product-info {
 
-
-
     grid-column: 1 / -1;
 
-
-
   }
-
-
-
-
-
-
 
   .quotation-area .quote-product-price {
 
-
-
     align-items: flex-start;
 
-
-
   }
-
-
-
-
-
-
 
   .quotation-area .add-button {
 
-
-
     justify-self: end;
 
-
-
   }
-
-
-
-
-
-
 
   .quotation-area .quote-item-controls {
 
-
-
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-
-
 
     gap: 10px;
 
-
-
   }
-
-
-
-
-
-
 
   .quotation-area .quote-actions {
 
-
-
     flex-direction: column;
 
-
-
   }
-
-
-
-
-
-
 
   .quotation-area .quote-actions button {
 
-
-
     width: 100%;
-
-
 
   }
 
-
-
 }
-
-
-
-
 
 /* =====================================================
 
@@ -4220,8 +1818,6 @@
 
 }
 
-
-
 .quotation-area .quotation-content {
 
   box-sizing: border-box;
@@ -4233,8 +1829,6 @@
   padding: 24px clamp(16px, 2vw, 30px) 32px;
 
 }
-
-
 
 .quotation-area .quote-layout {
 
@@ -4252,8 +1846,6 @@
 
 }
 
-
-
 .quotation-area .quote-main-column,
 
 .quotation-area .quote-preview-wrap {
@@ -4268,15 +1860,11 @@
 
 }
 
-
-
 .quotation-area .quote-main-column {
 
   grid-column: 1;
 
 }
-
-
 
 .quotation-area .quote-preview-wrap {
 
@@ -4302,8 +1890,6 @@
 
 }
 
-
-
 .quotation-area .quote-document {
 
   width: 100%;
@@ -4312,23 +1898,17 @@
 
 }
 
-
-
 .quotation-area .document-brand {
 
   align-items: flex-start;
 
 }
 
-
-
 .quotation-area .document-company {
 
   overflow-wrap: anywhere;
 
 }
-
-
 
 .quotation-area .document-quotation-label {
 
@@ -4338,15 +1918,11 @@
 
 }
 
-
-
 .quotation-area .quote-form-grid {
 
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 
 }
-
-
 
 @media (max-width: 1180px) {
 
@@ -4358,15 +1934,11 @@
 
   }
 
-
-
   .quotation-area .quotation-content {
 
     padding: 20px 16px 28px;
 
   }
-
-
 
   .quotation-area .quote-panel {
 
@@ -4376,8 +1948,6 @@
 
 }
 
-
-
 @media (max-width: 900px) {
 
   .quotation-area .quote-layout {
@@ -4385,8 +1955,6 @@
     grid-template-columns: minmax(0, 1fr) !important;
 
   }
-
-
 
   .quotation-area .quote-main-column,
 
@@ -4397,8 +1965,6 @@
     grid-row: auto;
 
   }
-
-
 
   .quotation-area .quote-preview-wrap {
 
@@ -4414,8 +1980,6 @@
 
 }
 
-
-
 @media (max-width: 600px) {
 
   .quotation-area .quote-form-grid {
@@ -4424,23 +1988,17 @@
 
   }
 
-
-
   .quotation-area .quote-product-result {
 
     grid-template-columns: minmax(0, 1fr) auto !important;
 
   }
 
-
-
   .quotation-area .quote-product-info {
 
     grid-column: 1 / -1;
 
   }
-
-
 
   .quotation-area .document-brand {
 
@@ -4450,8 +2008,6 @@
 
 }
 
-
-
 @media print {
 
   .quotation-area .quote-layout {
@@ -4459,8 +2015,6 @@
     display: block !important;
 
   }
-
-
 
   .quotation-area .quote-preview-wrap {
 
@@ -4474,10 +2028,6 @@
 
 }
 
-
-
-
-
 /* Fix quotation table alignment and keep amounts on one line */
 
 .document-table-wrap {
@@ -4487,8 +2037,6 @@
   overflow-x: auto;
 
 }
-
-
 
 .document-table {
 
@@ -4502,8 +2050,6 @@
 
 }
 
-
-
 .document-table th,
 
 .document-table td {
@@ -4515,8 +2061,6 @@
   vertical-align: middle;
 
 }
-
-
 
 /* Give each column a predictable width */
 
@@ -4530,8 +2074,6 @@
 
 }
 
-
-
 .document-table th:nth-child(2),
 
 .document-table td:nth-child(2) {
@@ -4543,8 +2085,6 @@
   white-space: nowrap;
 
 }
-
-
 
 .document-table th:nth-child(3),
 
@@ -4558,8 +2098,6 @@
 
 }
 
-
-
 .document-table th:nth-child(4),
 
 .document-table td:nth-child(4) {
@@ -4571,8 +2109,6 @@
   white-space: nowrap;
 
 }
-
-
 
 .document-table th:nth-child(5),
 
@@ -4590,8 +2126,6 @@
 
 }
 
-
-
 /* Prevent currency values from wrapping */
 
 .document-table td:nth-child(3),
@@ -4607,8 +2141,6 @@
   font-variant-numeric: tabular-nums;
 
 }
-
-
 
 /* Keep the totals panel aligned with the table */
 
@@ -4626,8 +2158,6 @@
 
 }
 
-
-
 .document-totals > div {
 
   display: flex;
@@ -4640,8 +2170,6 @@
 
 }
 
-
-
 .document-totals > div > span {
 
   flex: 1;
@@ -4650,8 +2178,6 @@
 
 }
 
-
-
 .document-totals > div > strong {
 
   flex-shrink: 0;
@@ -4659,8 +2185,6 @@
   text-align: right;
 
 }
-
-
 
 /* Keep the PDF table readable */
 
@@ -4676,8 +2200,6 @@
 
   }
 
-
-
   .document-table th,
 
   .document-table td {
@@ -4687,10 +2209,6 @@
   }
 
 }
-
-
-
-
 
 /* Attractive remove button for quotation items */
 
@@ -4738,8 +2256,6 @@
 
 }
 
-
-
 .quotation-area .quote-item-head .text-button::before {
 
   content: "✕";
@@ -4749,8 +2265,6 @@
   font-weight: 800;
 
 }
-
-
 
 .quotation-area .quote-item-head .text-button:hover {
 
@@ -4766,8 +2280,6 @@
 
 }
 
-
-
 .quotation-area .quote-item-head .text-button:active {
 
   transform: translateY(0);
@@ -4776,8 +2288,6 @@
 
 }
 
-
-
 .quotation-area .quote-item-head .text-button:focus-visible {
 
   outline: 3px solid rgba(220, 38, 38, 0.25);
@@ -4785,8 +2295,6 @@
   outline-offset: 3px;
 
 }
-
-
 
 /* Compact and touch-friendly on small screens */
 
@@ -4802,8 +2310,6 @@
 
 }
 
-
-
 @media (prefers-reduced-motion: reduce) {
 
   .quotation-area .quote-item-head .text-button {
@@ -4814,147 +2320,3 @@
 
 }
 
-
-
-
-
-
-/* Additional responsive safeguards — preserve the desktop two-column layout. */
-.quotation-area,
-.quotation-area .page-content,
-.quotation-area .quote-layout,
-.quotation-area .quote-main-column,
-.quotation-area .quote-preview-wrap {
-  min-width: 0;
-}
-
-.quotation-area .quote-preview-wrap {
-  width: 100%;
-}
-
-.quotation-area .quote-document {
-  max-width: 100%;
-}
-
-.quotation-area .document-table-wrap {
-  max-width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.quotation-area .document-table {
-  min-width: 430px;
-}
-
-@media (max-width: 900px) {
-  .quotation-area .quote-layout {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
-
-  .quotation-area .quote-main-column,
-  .quotation-area .quote-preview-wrap {
-    grid-column: 1;
-    grid-row: auto;
-  }
-
-  .quotation-area .quote-preview-wrap {
-    position: static;
-    max-height: none;
-    overflow: visible;
-    padding: 0;
-  }
-}
-
-@media (max-width: 600px) {
-  .quotation-content {
-    padding: 14px;
-  }
-
-  .quotation-area .quote-panel {
-    padding: 16px;
-  }
-
-  .quotation-area .quote-form-grid {
-    grid-template-columns: minmax(0, 1fr) !important;
-    gap: 16px !important;
-  }
-
-  .quotation-area .quote-form-grid > label.full-width {
-    grid-column: auto;
-  }
-
-  .quotation-area .quote-product-result {
-    grid-template-columns: minmax(0, 1fr) auto !important;
-    gap: 12px;
-  }
-
-  .quotation-area .quote-product-info {
-    grid-column: 1 / -1;
-  }
-
-  .quotation-area .quote-item-controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-
-  .quotation-area .quote-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .quotation-area .quote-actions button {
-    width: 100%;
-  }
-
-  .document-brand {
-    flex-wrap: wrap;
-  }
-
-  .document-company {
-    overflow-wrap: anywhere;
-  }
-
-  .document-quotation-label {
-    margin-left: auto;
-  }
-
-  .document-meta {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
-    padding: 10px;
-  }
-
-  .document-table {
-    min-width: 430px;
-  }
-
-  .document-supplier-terms {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 360px) {
-  .quotation-area .quote-item-controls {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .document-brand {
-    gap: 8px;
-    padding: 14px 12px;
-  }
-
-  .document-mark {
-    width: 34px;
-    height: 34px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .quotation-area *,
-  .quotation-area *::before,
-  .quotation-area *::after {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-  }
-}
