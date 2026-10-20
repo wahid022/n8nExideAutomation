@@ -11,7 +11,9 @@ export async function getProducts() {
   const data = await response.json();
 
   if (!Array.isArray(data)) {
-    throw new Error("Unexpected API response: expected an array of products.");
+    throw new Error(
+      "Unexpected API response: expected an array of products."
+    );
   }
 
   return data.map((item) => {
@@ -19,6 +21,8 @@ export async function getProducts() {
 
     return {
       ...product,
+
+      // Product details
       product_id: product["Product Code"] ?? "",
       product_name: product["Model / SKU"] ?? "",
       brand: product["Brand"] ?? "",
@@ -31,6 +35,10 @@ export async function getProducts() {
       specs: product["Specs / Capacity"] ?? "",
       hsn: product["HSN"] ?? "",
       effective_from: product["Effective From"] ?? "",
+
+      // GST rate from the master workbook.
+      // Example: 18 means 18%, not 0.18.
+      gst_rate: product["GST Rate %"] ?? null,
     };
   });
 }
