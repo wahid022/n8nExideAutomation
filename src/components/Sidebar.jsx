@@ -16,7 +16,7 @@ export default function Sidebar({ activePage }) {
 
         <div>
           <div className="brand-name">Bharat Batteries</div>
-          <div className="brand-subtitle">Wholesale Workspace</div>
+          <div className="brand-subtitle">Your Trusted Partner in Power Solutions</div>
         </div>
       </div>
 

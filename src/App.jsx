@@ -14,22 +14,12 @@ export default function App() {
 
           <Route
             path="/dashboard"
-            element={
-              <Dashboard
-                activePage="Dashboard"
-                onNavigate={() => {}}
-              />
-            }
+            element={<Dashboard activePage="Dashboard" onNavigate={() => {}} />}
           />
 
           <Route
             path="/quotation"
-            element={
-              <Quotation
-                activePage="Quotation"
-                onNavigate={() => {}}
-              />
-            }
+            element={<Quotation activePage="Quotation" onNavigate={() => {}} />}
           />
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
