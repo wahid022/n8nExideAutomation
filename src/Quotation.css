@@ -111,3 +111,109 @@
   .quote-document { padding: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; width: 100% !important; }
   .document-brand, .document-meta, .document-customer, .document-table, .document-totals, .document-terms, .document-signature, .document-footer { break-inside: avoid; }
 }
+
+
+/* Refined catalogue and quotation workspace polish */
+.catalogue-panel, .info-panel { border-radius: 16px; box-shadow: 0 8px 28px rgb(15 23 42 / 5%); transition: box-shadow 180ms ease, transform 180ms ease; }
+.catalogue-panel:hover, .info-panel:hover { box-shadow: 0 12px 32px rgb(15 23 42 / 8%); }
+.catalogue-header { background: linear-gradient(120deg, #ffffff 0%, #f5f9ff 100%); }
+.catalogue-heading-text h2 { letter-spacing: -0.35px; }
+.product-table thead th { background: #f3f7fd; color: #52627a; text-transform: uppercase; letter-spacing: .045em; font-size: 10px; }
+.product-table tbody tr { transition: background 150ms ease; }
+.product-table tbody tr:hover { background: #f5f9ff; }
+.filters-row input, .filters-row select { border-radius: 10px; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.filters-row input:focus, .filters-row select:focus { border-color: #75a5ff; box-shadow: 0 0 0 3px rgb(37 99 235 / 10%); outline: none; }
+.quote-panel { border-radius: 15px; box-shadow: 0 8px 24px rgb(15 23 42 / 4%); }
+.quote-section-title { padding-bottom: 2px; }
+.quote-product-result { border-radius: 10px; padding-left: 10px; padding-right: 10px; transition: background 150ms ease; }
+.quote-product-result:hover { background: #f6f9ff; }
+.quote-item-card { padding: 16px 0; }
+.primary-button, .secondary-button { transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease; }
+.primary-button:not(:disabled):hover, .secondary-button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgb(37 99 235 / 12%); }
+@media print { .document-table td small:nth-of-type(2) { display: none !important; } }
+
+/* Quotation builder: product discovery + selected-item workspace */
+.quotation-content { max-width: 1840px; padding-top: 22px; }
+.quotation-heading h1 { font-size: clamp(24px, 2vw, 31px); letter-spacing: -0.8px; }
+.quotation-heading p { font-size: 13px; }
+.quote-layout { grid-template-columns: minmax(0, 1.45fr) minmax(360px, .85fr); gap: 18px; }
+.quote-main-column { gap: 18px; }
+.quote-panel { padding: 22px; border: 1px solid #e4ebf5; background: linear-gradient(180deg, #fff 0%, #fcfdff 100%); border-radius: 16px; box-shadow: 0 5px 18px rgb(24 55 100 / 4%); }
+.quote-section-title { align-items: center; gap: 12px; margin-bottom: 18px; }
+.step-number { flex-basis: 36px; width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(145deg,#e9f2ff,#dceaff); color: #1458c8; box-shadow: inset 0 0 0 1px #d7e7ff; }
+.quote-section-title h2, .preview-heading h2 { font-size: 17px; letter-spacing: -.3px; }
+.quote-section-title p { line-height: 1.45; }
+
+/* Search bar feels like a dedicated search tool */
+.quote-search { height: 50px; padding: 0 15px; border: 1px solid #d5e2f4; border-radius: 12px; background: #f9fbff; box-shadow: inset 0 1px 2px rgb(15 23 42 / 2%); }
+.quote-search:focus-within { border-color: #7eabff; background: #fff; box-shadow: 0 0 0 4px rgb(37 99 235 / 9%); }
+.quote-search span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: #e5efff; color: #1458c8; font-size: 20px; }
+.quote-search input { font-size: 13px; }
+.quote-search input::placeholder { color: #91a0b6; }
+
+/* Up to five suggestions are displayed as distinct product tiles */
+.quote-product-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
+.quote-product-result { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 12px; min-width: 0; min-height: 185px; padding: 15px; border: 1px solid #dfe8f5; border-radius: 14px; background: #fff; box-shadow: 0 2px 8px rgb(30 64 115 / 3%); transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease, background .18s ease; }
+.quote-product-result:hover { transform: translateY(-3px); border-color: #9fc1ff; background: linear-gradient(180deg,#fff 0%,#f8fbff 100%); box-shadow: 0 10px 22px rgb(37 99 235 / 9%); }
+.quote-product-info { flex: 1 1 auto; gap: 7px; }
+.quote-product-info strong { color: #142744; font-size: 13px; line-height: 1.45; }
+.quote-product-info span { font-size: 11px; line-height: 1.45; }
+.quote-product-price { color: #132b4c; font-size: 15px; letter-spacing: -.2px; }
+.quote-product-price small { margin-top: 4px; color: #8a9ab1; font-size: 10px; }
+.add-button { width: 100%; min-height: 38px; border-radius: 10px; font-size: 12px; }
+.quote-product-result .add-button:disabled { background: #eef5ff; border-color: #dbeafe; color: #2563eb; }
+
+/* Selected products become clear editable cards, not a long unstructured form */
+.quote-item-card { padding: 17px; margin-top: 12px; border: 1px solid #e1eaf6; border-radius: 14px; background: #fff; box-shadow: 0 2px 8px rgb(15 23 42 / 2%); transition: border-color .18s ease, box-shadow .18s ease; }
+.quote-item-card:hover { border-color: #c5d9f8; box-shadow: 0 6px 16px rgb(15 23 42 / 5%); }
+.quote-item-card:last-child { border-bottom: 1px solid #e1eaf6; }
+.quote-item-head { align-items: center; padding-bottom: 13px; border-bottom: 1px solid #eef2f8; }
+.quote-item-head > div { gap: 6px; }
+.quote-item-head strong { color: #142744; font-size: 14px; }
+.quote-item-head span { font-size: 11px; }
+.text-button { padding: 7px 10px; border: 1px solid #fee2e2; border-radius: 8px; background: #fff7f7; font-size: 11px; transition: background .15s ease; }
+.text-button:hover { background: #fee2e2; }
+.quote-item-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px 18px; margin-top: 15px; }
+.quote-item-controls label { gap: 7px; color: #52647e; font-size: 11px; }
+.quote-item-controls input { min-height: 42px; padding: 9px 11px; border-color: #d9e4f2; border-radius: 9px; background: #fbfdff; font-size: 13px; font-weight: 650; }
+.quote-item-controls input:hover { border-color: #b9cde9; }
+.quote-item-controls > div { justify-content: center; gap: 6px; padding: 4px 0; }
+.quote-item-controls > div span { color: #8292aa; font-size: 10px; }
+.quote-item-controls > div strong { color: #162e4f; font-size: 13px; }
+.item-count { min-width: 28px; height: 24px; padding: 0 8px; border-radius: 999px; background: #eaf2ff; color: #175ac5; font-size: 11px; vertical-align: middle; }
+.quote-empty { min-height: 170px; border: 1px dashed #cbd9ed; border-radius: 14px; background: #f9fbff; }
+.quote-empty > span { width: 48px; height: 48px; border-radius: 15px; background: #e8f1ff; font-size: 28px; }
+
+/* Customer/settings inputs and action buttons */
+.quote-form-grid { gap: 17px; }
+.quote-form-grid label { color: #52647e; font-size: 11px; }
+.quote-form-grid input, .quote-form-grid textarea { min-height: 42px; padding: 10px 12px; border-color: #d9e4f2; border-radius: 9px; background: #fbfdff; font-size: 12px; }
+.quote-form-grid textarea { min-height: 82px; }
+.primary-button, .secondary-button { min-height: 40px; border-radius: 10px; font-size: 12px; }
+.primary-button { box-shadow: 0 4px 10px rgb(37 99 235 / 12%); }
+.generate-button { min-height: 46px; padding: 13px 20px; }
+.quote-actions { padding: 2px 0 8px; }
+.quote-preview-wrap { top: 14px; }
+.preview-heading { padding: 15px 17px; border: 1px solid #e4ebf5; border-radius: 14px; background: #fff; }
+.quote-document { border-radius: 14px; box-shadow: 0 10px 30px rgb(15 23 42 / 8%); }
+
+@media (min-width: 1450px) {
+  .quote-product-results { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+@media (max-width: 1449px) and (min-width: 1181px) {
+  .quote-product-results { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 1180px) {
+  .quote-layout { grid-template-columns: minmax(0, 1fr); }
+  .quote-preview-wrap { max-width: none; }
+  .quote-product-results { grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); }
+}
+@media (max-width: 760px) {
+  .quote-product-results { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .quote-product-result { padding: 12px; min-height: 175px; }
+  .quote-item-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+  .quote-item-card { padding: 13px; }
+}
+@media (max-width: 420px) {
+  .quote-product-results { grid-template-columns: 1fr; }
+}

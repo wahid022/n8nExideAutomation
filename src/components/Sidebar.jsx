@@ -1,19 +1,21 @@
 
+import { useNavigate } from "react-router-dom";
+
 const navItems = [
-  { icon: "▦", label: "Dashboard" },
-  { icon: "▤", label: "Quotation" },
+  { icon: "▦", label: "Dashboard", path: "/dashboard" },
+  { icon: "▤", label: "Quotation", path: "/quotation" },
 ];
 
-export default function Sidebar({ activePage, onNavigate }) {
+export default function Sidebar({ activePage }) {
+  const navigate = useNavigate();
+
   return (
     <aside className="sidebar">
       <div className="brand">
         <div className="brand-mark">BB</div>
 
         <div>
-          <div className="brand-name">
-            Bharat Batteries
-          </div>
+          <div className="brand-name">Bharat Batteries</div>
           <div className="brand-subtitle">Wholesale Workspace</div>
         </div>
       </div>
@@ -26,7 +28,7 @@ export default function Sidebar({ activePage, onNavigate }) {
             className={`nav-item ${
               activePage === item.label ? "active" : ""
             }`}
-            onClick={() => onNavigate(item.label)}
+            onClick={() => navigate(item.path)}
           >
             <span className="nav-icon">{item.icon}</span>
             {item.label}
