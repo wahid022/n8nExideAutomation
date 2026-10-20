@@ -3,23 +3,9 @@ import { useMemo } from "react";
 
 const DEFAULT_BRAND = "All Brands";
 const DEFAULT_CATEGORY = "All Categories";
-const DEFAULT_PRICE_TYPE = "All Price Types";
 
 function getValue(product, alias, workbookField) {
   return product?.[alias] ?? product?.[workbookField] ?? "";
-}
-
-function hasPrice(product, priceType) {
-  if (priceType === DEFAULT_PRICE_TYPE) return true;
-
-  const field = priceType === "MRP" ? "MRP" : "Dealer Price";
-  const alias = priceType === "MRP" ? "mrp" : "dealer_price";
-  const value = getValue(product, alias, field);
-
-  return value !== null &&
-    value !== undefined &&
-    String(value).trim() !== "" &&
-    Number.isFinite(Number(value));
 }
 
 export default function useProductFilters({
@@ -27,7 +13,6 @@ export default function useProductFilters({
   search = "",
   brand = DEFAULT_BRAND,
   category = DEFAULT_CATEGORY,
-  priceType = DEFAULT_PRICE_TYPE,
 }) {
   return useMemo(() => {
     const term = String(search).trim().toLowerCase();
@@ -55,20 +40,18 @@ export default function useProductFilters({
         getValue(product, "category", "Category")
       ).trim();
 
-      const matchesSearch = !term || searchableText.includes(term);
+      const matchesSearch =
+        !term || searchableText.includes(term);
+
       const matchesBrand =
         brand === DEFAULT_BRAND ||
         productBrand.toLowerCase() === brand.toLowerCase();
+
       const matchesCategory =
         category === DEFAULT_CATEGORY ||
         productCategory.toLowerCase() === category.toLowerCase();
 
-      return (
-        matchesSearch &&
-        matchesBrand &&
-        matchesCategory &&
-        hasPrice(product, priceType)
-      );
+      return matchesSearch && matchesBrand && matchesCategory;
     });
-  }, [products, search, brand, category, priceType]);
+  }, [products, search, brand, category]);
 }

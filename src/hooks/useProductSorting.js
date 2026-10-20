@@ -8,7 +8,7 @@ function getValue(product, alias, workbookField) {
 function getName(product) {
   return String(
     getValue(product, "product_name", "Model / SKU") ||
-    getValue(product, "model", "Model / SKU")
+      getValue(product, "model", "Model / SKU")
   ).trim();
 }
 
@@ -16,12 +16,14 @@ function getBrand(product) {
   return String(getValue(product, "brand", "Brand")).trim();
 }
 
-function getPrice(product, priceType) {
-  const field = priceType === "MRP" ? "MRP" : "Dealer Price";
-  const alias = priceType === "MRP" ? "mrp" : "dealer_price";
-  const value = getValue(product, alias, field);
+function getPrice(product) {
+  const value = getValue(product, "dealer_price", "Dealer Price");
 
-  if (value === null || value === undefined || String(value).trim() === "") {
+  if (
+    value === null ||
+    value === undefined ||
+    String(value).trim() === ""
+  ) {
     return null;
   }
 
@@ -32,10 +34,11 @@ function getPrice(product, priceType) {
 export default function useProductSorting({
   products = [],
   sortBy = "default",
-  priceType = "All Price Types",
 }) {
   return useMemo(() => {
-    if (sortBy === "default") return products;
+    if (sortBy === "default") {
+      return products;
+    }
 
     const sorted = [...products];
 
@@ -62,6 +65,7 @@ export default function useProductSorting({
         sorted.sort((a, b) =>
           getBrand(a).localeCompare(getBrand(b), undefined, {
             sensitivity: "base",
+            numeric: true,
           })
         );
         break;
@@ -70,6 +74,7 @@ export default function useProductSorting({
         sorted.sort((a, b) =>
           getBrand(b).localeCompare(getBrand(a), undefined, {
             sensitivity: "base",
+            numeric: true,
           })
         );
         break;
@@ -79,10 +84,10 @@ export default function useProductSorting({
         const direction = sortBy === "price-asc" ? 1 : -1;
 
         sorted.sort((a, b) => {
-          const priceA = getPrice(a, priceType);
-          const priceB = getPrice(b, priceType);
+          const priceA = getPrice(a);
+          const priceB = getPrice(b);
 
-          // Keep products without the selected price at the end.
+          // Products without a valid Dealer Price remain at the end.
           if (priceA === null && priceB === null) return 0;
           if (priceA === null) return 1;
           if (priceB === null) return -1;
@@ -97,5 +102,5 @@ export default function useProductSorting({
     }
 
     return sorted;
-  }, [products, sortBy, priceType]);
+  }, [products, sortBy]);
 }

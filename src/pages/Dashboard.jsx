@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { getProducts } from "../services/productService";
 import useProductFilters from "../hooks/useProductFilters";
 import useProductSorting from "../hooks/useProductSorting";
@@ -10,7 +10,6 @@ import PriceLookup from "../components/PriceLookup";
 
 const DEFAULT_BRAND = "All Brands";
 const DEFAULT_CATEGORY = "All Categories";
-const DEFAULT_PRICE_TYPE = "All Price Types";
 const DEFAULT_PAGE_SIZE = 25;
 
 function formatINR(value) {
@@ -68,7 +67,6 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [brand, setBrand] = useState(DEFAULT_BRAND);
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
-  const [priceType, setPriceType] = useState(DEFAULT_PRICE_TYPE);
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +74,7 @@ export default function Dashboard() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [selectedProductId, setSelectedProductId] = useState("");
+  const [editingProductId, setEditingProductId] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -115,7 +113,7 @@ export default function Dashboard() {
         ...new Set(
           products
             .map((product) => getField(product, "brand", "Brand"))
-            .filter((value) => hasValue(value))
+            .filter(hasValue)
             .map((value) => String(value).trim())
         ),
       ].sort((a, b) => a.localeCompare(b)),
@@ -128,7 +126,7 @@ export default function Dashboard() {
         ...new Set(
           products
             .map((product) => getField(product, "category", "Category"))
-            .filter((value) => hasValue(value))
+            .filter(hasValue)
             .map((value) => String(value).trim())
         ),
       ].sort((a, b) => a.localeCompare(b)),
@@ -140,13 +138,11 @@ export default function Dashboard() {
     search,
     brand,
     category,
-    priceType,
   });
 
   const sortedProducts = useProductSorting({
     products: filteredProducts,
     sortBy,
-    priceType,
   });
 
   const totalProducts = sortedProducts.length;
@@ -176,14 +172,6 @@ export default function Dashboard() {
     );
   }, [visiblePage, totalPages]);
 
-  const selectedProduct = useMemo(
-    () =>
-      products.find(
-        (product) => getProductCode(product) === selectedProductId
-      ),
-    [products, selectedProductId]
-  );
-
   const pricedProductsCount = useMemo(
     () =>
       products.filter(
@@ -207,9 +195,9 @@ export default function Dashboard() {
     setSearch("");
     setBrand(DEFAULT_BRAND);
     setCategory(DEFAULT_CATEGORY);
-    setPriceType(DEFAULT_PRICE_TYPE);
     setSortBy("default");
     setCurrentPage(1);
+    setEditingProductId("");
   }
 
   function handlePriceUpdated({ product_code, field, value }) {
@@ -331,6 +319,7 @@ export default function Dashboard() {
                   onChange={(event) => {
                     setCurrentPage(1);
                     setBrand(event.target.value);
+                    setEditingProductId("");
                   }}
                 >
                   <option value={DEFAULT_BRAND}>All Brands</option>
@@ -349,6 +338,7 @@ export default function Dashboard() {
                   onChange={(event) => {
                     setCurrentPage(1);
                     setCategory(event.target.value);
+                    setEditingProductId("");
                   }}
                 >
                   <option value={DEFAULT_CATEGORY}>All Categories</option>
@@ -361,27 +351,13 @@ export default function Dashboard() {
               </label>
 
               <label className="filter-field">
-                <span>Price Type</span>
-                <select
-                  value={priceType}
-                  onChange={(event) => {
-                    setCurrentPage(1);
-                    setPriceType(event.target.value);
-                  }}
-                >
-                  <option value={DEFAULT_PRICE_TYPE}>All Price Types</option>
-                  <option value="MRP">MRP</option>
-                  <option value="Dealer Price">Dealer Price</option>
-                </select>
-              </label>
-
-              <label className="filter-field">
                 <span>Sort By</span>
                 <select
                   value={sortBy}
                   onChange={(event) => {
                     setCurrentPage(1);
                     setSortBy(event.target.value);
+                    setEditingProductId("");
                   }}
                 >
                   <option value="default">Default Order</option>
@@ -413,15 +389,14 @@ export default function Dashboard() {
                     <th>Category</th>
                     <th>MRP</th>
                     <th>Dealer Price</th>
-                    <th>Price Details</th>
-                    <th>Details</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={8}>
+                      <td colSpan={7}>
                         <div className="empty-state">
                           <h3>Loading products...</h3>
                           <p>Please wait while we fetch your catalogue.</p>
@@ -430,7 +405,7 @@ export default function Dashboard() {
                     </tr>
                   ) : error ? (
                     <tr>
-                      <td colSpan={8}>
+                      <td colSpan={7}>
                         <div className="empty-state">
                           <h3>Unable to load products</h3>
                           <p>Check your n8n connection and try again.</p>
@@ -439,7 +414,7 @@ export default function Dashboard() {
                     </tr>
                   ) : paginatedProducts.length === 0 ? (
                     <tr>
-                      <td colSpan={8}>
+                      <td colSpan={7}>
                         <div className="empty-state">
                           <h3>No matching products found</h3>
                           <p>
@@ -474,39 +449,52 @@ export default function Dashboard() {
                         "dealer_price",
                         "Dealer Price"
                       );
+                      const isEditing = editingProductId === productId;
 
                       return (
-                        <tr key={productId || index}>
-                          <td>
-                            <strong>{productName || "—"}</strong>
-                            <div>{productId}</div>
-                          </td>
+                        <Fragment key={productId || index}>
+                          <tr>
+                            <td>
+                              <strong>{productName || "—"}</strong>
+                              <div>{productId}</div>
+                            </td>
 
-                          <td>{productBrand || "—"}</td>
-                          <td>{modelCode || "—"}</td>
-                          <td>{productCategory || "—"}</td>
-                          <td>{formatINR(mrpValue)}</td>
-                          <td>{formatINR(dealerPriceValue)}</td>
+                            <td>{productBrand || "—"}</td>
+                            <td>{modelCode || "—"}</td>
+                            <td>{productCategory || "—"}</td>
+                            <td>{formatINR(mrpValue)}</td>
+                            <td>{formatINR(dealerPriceValue)}</td>
 
-                          <td>
-                            <button
-                              type="button"
-                              className="secondary-button"
-                              onClick={() => setSelectedProductId(productId)}
-                              disabled={!productId}
-                            >
-                              View Prices
-                            </button>
-                          </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="secondary-button"
+                                disabled={!productId}
+                                aria-expanded={isEditing}
+                                onClick={() =>
+                                  setEditingProductId(
+                                    isEditing ? "" : productId
+                                  )
+                                }
+                              >
+                                {isEditing ? "Close Editor" : "Edit Price"}
+                              </button>
+                            </td>
+                          </tr>
 
-                          <td>
-                            {product?.["Specs / Capacity"] ||
-                              product?.specs ||
-                              product?.Warranty ||
-                              product?.warranty ||
-                              "—"}
-                          </td>
-                        </tr>
+                          {isEditing && (
+                            <tr className="inline-price-editor-row">
+                              <td colSpan={7} style={{ padding: 12 }}>
+                                <PriceLookup
+                                  key={productId}
+                                  product={product}
+                                  onPriceUpdated={handlePriceUpdated}
+                                  onCancel={() => setEditingProductId("")}
+                                />
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
                       );
                     })
                   )}
@@ -530,6 +518,7 @@ export default function Dashboard() {
                     onChange={(event) => {
                       setCurrentPage(1);
                       setPageSize(Number(event.target.value));
+                      setEditingProductId("");
                     }}
                     disabled={loading}
                   >
@@ -615,81 +604,6 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {selectedProductId && (
-            <section
-              style={{
-                position: "relative",
-                marginTop: 20,
-                padding: 16,
-                border: "1px solid var(--border-color, #e5e7eb)",
-                borderRadius: 12,
-                background: "var(--card-bg, #fff)",
-              }}
-            >
-              <button
-                type="button"
-                className="secondary-button"
-                style={{ float: "right" }}
-                onClick={() => setSelectedProductId("")}
-              >
-                Close
-              </button>
-
-              <h2>Prices for {selectedProductId}</h2>
-              <p>
-                Current master-sheet prices for the selected product.
-              </p>
-
-              {!selectedProduct ? (
-                <p role="status">
-                  This product is not present in the currently loaded
-                  Product Master data.
-                </p>
-              ) : (
-                <div className="table-wrapper">
-                  <table className="product-table">
-                    <thead>
-                      <tr>
-                        <th>Product Code</th>
-                        <th>MRP</th>
-                        <th>Dealer Price</th>
-                        <th>Effective From</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>{getProductCode(selectedProduct) || "—"}</td>
-                        <td>
-                          {formatINR(
-                            getField(selectedProduct, "mrp", "MRP")
-                          )}
-                        </td>
-                        <td>
-                          {formatINR(
-                            getField(
-                              selectedProduct,
-                              "dealer_price",
-                              "Dealer Price"
-                            )
-                          )}
-                        </td>
-                        <td>
-                          {getField(
-                            selectedProduct,
-                            "effective_from",
-                            "Effective From"
-                          ) || "—"}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-          )}
-
-          <PriceLookup onPriceUpdated={handlePriceUpdated} />
-
           <section className="bottom-grid">
             <article className="info-panel">
               <div className="panel-heading compact">
@@ -745,8 +659,7 @@ export default function Dashboard() {
                 <div>
                   <strong>Price editing</strong>
                   <p>
-                    Price updates are saved to the Dealer Price and MRP
-                    columns in Product Master.
+                    Edit MRP or Dealer Price directly from each product row.
                   </p>
                 </div>
               </div>

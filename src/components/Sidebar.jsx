@@ -1,20 +1,17 @@
 
 const navItems = [
   { icon: "▦", label: "Dashboard" },
-  { icon: "□", label: "Products" },
-  { icon: "₹", label: "Price Lists" },
-  { icon: "▤", label: "Categories" },
-  { icon: "↻", label: "Import & Logs" },
 ];
 
 export default function Sidebar({ activePage, onNavigate }) {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">E</div>
+        <div className="brand-mark">BB</div>
+
         <div>
           <div className="brand-name">
-            Exide <span>& Microtek</span>
+            Bharat Batteries
           </div>
           <div className="brand-subtitle">Product Catalogue</div>
         </div>
@@ -24,6 +21,7 @@ export default function Sidebar({ activePage, onNavigate }) {
         {navItems.map((item) => (
           <button
             key={item.label}
+            type="button"
             className={`nav-item ${
               activePage === item.label ? "active" : ""
             }`}
@@ -37,9 +35,11 @@ export default function Sidebar({ activePage, onNavigate }) {
 
       <div className="sidebar-bottom">
         <div className="database-icon">▤</div>
+
         <div>
           <strong>Master Database</strong>
           <p>Excel workbook</p>
+
           <span className="status-pill">
             <span className="status-dot" />
             Awaiting data connection
