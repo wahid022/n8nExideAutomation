@@ -61,9 +61,8 @@ function hasPrice(product, field) {
   return hasValue(value) && Number.isFinite(Number(value));
 }
 
-export default function Dashboard() {
+export default function Dashboard({ activePage = "Dashboard", onNavigate = () => {} }) {
   const [sortBy, setSortBy] = useState("default");
-  const [activePage, setActivePage] = useState("Dashboard");
   const [search, setSearch] = useState("");
   const [brand, setBrand] = useState(DEFAULT_BRAND);
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
@@ -225,7 +224,7 @@ export default function Dashboard() {
 
   return (
     <div className="app-layout">
-      <Sidebar activePage={activePage} onNavigate={setActivePage} />
+      <Sidebar activePage={activePage} onNavigate={onNavigate} />
 
       <div className="main-area">
         <Topbar search={search} onSearch={handleSearch} />

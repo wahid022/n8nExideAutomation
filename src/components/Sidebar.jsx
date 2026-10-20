@@ -1,6 +1,7 @@
 
 const navItems = [
   { icon: "▦", label: "Dashboard" },
+  { icon: "▤", label: "Quotation" },
 ];
 
 export default function Sidebar({ activePage, onNavigate }) {
@@ -13,7 +14,7 @@ export default function Sidebar({ activePage, onNavigate }) {
           <div className="brand-name">
             Bharat Batteries
           </div>
-          <div className="brand-subtitle">Product Catalogue</div>
+          <div className="brand-subtitle">Wholesale Workspace</div>
         </div>
       </div>
 
@@ -42,7 +43,7 @@ export default function Sidebar({ activePage, onNavigate }) {
 
           <span className="status-pill">
             <span className="status-dot" />
-            Awaiting data connection
+            Excel data source
           </span>
         </div>
       </div>
