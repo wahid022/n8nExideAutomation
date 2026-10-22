@@ -22,3 +22,18 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# Environment secrets
+.env
+.env.*
+!.env.example
+backend/.env
+
+# Local database backups
+backend/*.dump
+backend/*.backup
+
+
+# Local source workbook and audit scripts
+/Unified_Product_Price_Master_Refined_Final.xlsx
+/deep-audit.cjs
+/inspect-workbook.cjs
