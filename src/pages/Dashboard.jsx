@@ -230,7 +230,6 @@ export default function Dashboard({ activePage = "Dashboard", onNavigate = () =>
         <Topbar />
 
         <div className="dashboard-search-toolbar no-print">
-          <div className="search-toolbar-label">Product catalogue</div>
           <div className="global-search">
             <span className="search-icon" aria-hidden="true">⌕</span>
             <input

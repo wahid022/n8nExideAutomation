@@ -1,15 +1,21 @@
 
 import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
 
-const UPDATE_URL =
-  import.meta.env.VITE_PRODUCT_MASTER_UPDATE_URL ||
-  "http://localhost:8001/update-product-price";
+const API_BASE = (
+  import.meta.env.VITE_PRODUCTS_API_URL ||
+  "http://127.0.0.1:3001/api/products"
+).replace(/\/+$/, "");
 
 const PRICE_FIELDS = ["MRP", "Dealer Price"];
 
 function getCode(product) {
   return String(
-    product?.["Product Code"] ?? product?.product_id ?? ""
+    product?.["Product Code"] ??
+      product?.productCode ??
+      product?.product_code ??
+      product?.product_id ??
+      ""
   ).trim();
 }
 
@@ -17,7 +23,7 @@ function getPrice(product, field) {
   const value =
     field === "MRP"
       ? product?.["MRP"] ?? product?.mrp
-      : product?.["Dealer Price"] ?? product?.dealer_price;
+      : product?.["Dealer Price"] ?? product?.dealerPrice ?? product?.dealer_price;
 
   return value === null || value === undefined ? "" : String(value);
 }
@@ -68,10 +74,13 @@ export default function PriceLookup({
     if (trimmed !== "") {
       value = Number(trimmed);
 
-      if (!Number.isFinite(value) || value < 0) {
-        setError(
-          "Enter a valid price greater than or equal to zero, or leave it blank to clear it."
-        );
+      if (
+        !Number.isFinite(value) ||
+        value < 0 ||
+        value > 9999999999.99 ||
+        Math.round(value * 100) !== Math.round(value) * 100
+      ) {
+        setError("Enter a valid price with up to two decimal places, or leave it blank to clear it.");
         return;
       }
     }
@@ -88,32 +97,52 @@ export default function PriceLookup({
     setSaving(true);
 
     try {
-      const response = await fetch(UPDATE_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          product_code: productCode,
-          field: editingField,
-          value,
-        }),
-      });
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (!session?.access_token) {
+        throw new Error("Your session has expired. Please sign in again.");
+      }
+
+      const response = await fetch(
+        `${API_BASE}/${encodeURIComponent(productCode)}/price`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          cache: "no-store",
+          body: JSON.stringify({
+            field: editingField,
+            value,
+          }),
+        }
+      );
 
       const result = await response.json().catch(() => ({}));
 
-      if (!response.ok || result.success === false) {
+      if (!response.ok || result.success !== true) {
         throw new Error(
-          result.detail ||
+          result.error ||
+            result.detail ||
             result.message ||
             `Price update failed with HTTP ${response.status}.`
         );
       }
 
       const updatedValue =
-        result.updated_value !== undefined
-          ? result.updated_value
-          : value;
+        result.value !== undefined
+          ? result.value
+          : result.updated_value !== undefined
+            ? result.updated_value
+            : value;
 
       await onPriceUpdated?.({
         product_code: productCode,
@@ -127,9 +156,13 @@ export default function PriceLookup({
           : String(updatedValue)
       );
 
-      setNotice(`${editingField} saved for ${productCode}.`);
+      setNotice(
+        result.changed === false
+          ? "No changes to save."
+          : `${editingField} saved for ${productCode}. Audit recorded.`
+      );
     } catch (err) {
-      setError(err.message || "Unable to update the Product Master.");
+      setError(err.message || "Unable to update the product price.");
     } finally {
       setSaving(false);
     }
@@ -182,6 +215,7 @@ export default function PriceLookup({
           </h3>
           <p style={{ margin: 0, color: "#64748b", fontSize: 12 }}>
             {product?.["Model / SKU"] ??
+              product?.modelSku ??
               product?.product_name ??
               "Selected product"}
           </p>
@@ -227,6 +261,7 @@ export default function PriceLookup({
               style={{ ...inputStyle, marginTop: 6 }}
               type="number"
               min="0"
+              max="9999999999.99"
               step="0.01"
               value={newValue}
               onChange={(event) => setNewValue(event.target.value)}

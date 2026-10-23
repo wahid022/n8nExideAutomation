@@ -14,6 +14,10 @@ const migrations = [
     version: '002_import_fingerprint',
     file: '../sql/migrations/002_import_fingerprint.sql',
   },
+  {
+    version: '003_price_change_audit',
+    file: '../sql/migrations/003_price_change_audit.sql',
+  },
 ];
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -39,18 +43,20 @@ async function main() {
         );
       }
 
-      const column = await client.query(
-        `SELECT 1
-         FROM information_schema.columns
-         WHERE table_schema = 'public'
-           AND table_name = 'import_batches'
-           AND column_name = 'source_sha256'`,
-      );
-
-      if (column.rowCount) {
-        throw new Error(
-          'source_sha256 already exists but migration 002 is unrecorded. Inspect the database before proceeding.',
+      if (migration.version === '002_import_fingerprint') {
+        const column = await client.query(
+          `SELECT 1
+           FROM information_schema.columns
+           WHERE table_schema = 'public'
+             AND table_name = 'import_batches'
+             AND column_name = 'source_sha256'`,
         );
+
+        if (column.rowCount) {
+          throw new Error(
+            'source_sha256 already exists but migration 002 is unrecorded. Inspect the database before proceeding.',
+          );
+        }
       }
 
       const sql = await readFile(
@@ -59,6 +65,7 @@ async function main() {
       );
 
       await client.query('BEGIN');
+
       try {
         await client.query(sql);
         await client.query(
