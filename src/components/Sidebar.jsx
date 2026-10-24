@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 const navItems = [
   { icon: "▦", label: "Dashboard", path: "/dashboard" },
   { icon: "▤", label: "Quotation", path: "/quotation" },
+  { icon: "♙", label: "Customers", path: "/customers" },
 ];
 
 export default function Sidebar({ activePage }) {

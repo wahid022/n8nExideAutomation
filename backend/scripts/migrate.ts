@@ -18,6 +18,14 @@ const migrations = [
     version: '003_price_change_audit',
     file: '../sql/migrations/003_price_change_audit.sql',
   },
+  {
+    version: '004_customers_quotations',
+    file: '../sql/migrations/004_customers_quotations.sql',
+  },
+  {
+    version: '005_sales_documents',
+    file: '../sql/migrations/005_sales_documents.sql',
+  },
 ];
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));

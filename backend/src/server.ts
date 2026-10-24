@@ -640,6 +640,224 @@ app.patch(
 );
 
 // -----------------------------------------------------------------------------
+// Customer and quotation persistence
+// -----------------------------------------------------------------------------
+
+app.get('/api/customers', requireSupabaseUser, async (req, res) => {
+  const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
+  try {
+    const result = await pool.query(
+      `SELECT id, business_name AS "businessName", contact_name AS "contactName",
+              phone, gstin, billing_address AS "billingAddress", state,
+              customer_type AS "customerType"
+       FROM public.customers
+       WHERE $1 = '' OR business_name ILIKE $2 OR contact_name ILIKE $2
+          OR phone ILIKE $2 OR COALESCE(gstin, '') ILIKE $2
+          OR COALESCE(billing_address, '') ILIKE $2 OR COALESCE(state, '') ILIKE $2
+       ORDER BY business_name ASC LIMIT 50`,
+      [search, `%${search.replace(/[\\%_]/g, '\\$&')}%`],
+    );
+    res.json({ data: result.rows });
+  } catch (error) {
+    const pgError = error as { code?: string };
+    console.error('Customer lookup failed:', error instanceof Error ? error.message : error);
+    if (pgError.code === '42P01') {
+      res.status(503).json({ error: 'Customer tables are not installed yet. From the backend folder, run npm.cmd run migrate and then restart the backend.' });
+      return;
+    }
+    res.status(500).json({ error: 'Unable to load customers.' });
+  }
+});
+
+app.post('/api/customers', requireSupabaseUser, async (req, res) => {
+  const user = res.locals.authenticatedUser as AuthenticatedUser;
+  const body = req.body as Record<string, unknown>;
+  const businessName = typeof body.businessName === 'string' ? body.businessName.trim() : '';
+  const contactName = typeof body.contactName === 'string' ? body.contactName.trim() : '';
+  const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+  const gstin = typeof body.gstin === 'string' ? body.gstin.trim().toUpperCase() : '';
+  const billingAddress = typeof body.billingAddress === 'string' ? body.billingAddress.trim() : '';
+  const state = typeof body.state === 'string' ? body.state.trim() : '';
+  const customerType = ['Retailer', 'Wholesaler', 'Other'].includes(String(body.customerType)) ? String(body.customerType) : 'Retailer';
+
+  if (!businessName || !contactName || !phone || businessName.length > 200 || contactName.length > 200 || phone.length > 40 || gstin.length > 15 || billingAddress.length > 1000 || state.length > 100) {
+    res.status(400).json({ error: 'Enter a valid business name, contact name and phone number.' });
+    return;
+  }
+  if (gstin && !/^[0-9A-Z]{15}$/.test(gstin)) {
+    res.status(400).json({ error: 'GSTIN must contain 15 letters/numbers.' });
+    return;
+  }
+
+  try {
+    const duplicate = await pool.query(
+      `SELECT id, business_name AS "businessName", contact_name AS "contactName", phone,
+              gstin, billing_address AS "billingAddress", state, customer_type AS "customerType"
+       FROM public.customers
+       WHERE (phone = $1 AND lower(business_name) = lower($2))
+          OR ($3 <> '' AND gstin = $3)
+       ORDER BY id LIMIT 1`,
+      [phone, businessName, gstin],
+    );
+    if (duplicate.rowCount) {
+      res.status(409).json({ error: 'A customer with this business name and phone, or this GSTIN, already exists.', customer: duplicate.rows[0] });
+      return;
+    }
+    const result = await pool.query(
+      `INSERT INTO public.customers (business_name, contact_name, phone, gstin, billing_address, state, customer_type, created_by)
+       VALUES ($1,$2,$3,NULLIF($4,''),NULLIF($5,''),NULLIF($6,''),$7,$8)
+       RETURNING id, business_name AS "businessName", contact_name AS "contactName", phone, gstin,
+                 billing_address AS "billingAddress", state, customer_type AS "customerType"`,
+      [businessName, contactName, phone, gstin, billingAddress, state, customerType, user.id],
+    );
+    res.status(201).json({ success: true, customer: result.rows[0] });
+  } catch (error) {
+    const pgError = error as { code?: string };
+    console.error('Customer creation failed:', error instanceof Error ? error.message : error);
+    if (pgError.code === '42P01') {
+      res.status(503).json({ error: 'Customer tables are not installed yet. From the backend folder, run npm.cmd run migrate and then restart the backend.' });
+      return;
+    }
+    res.status(500).json({ error: 'Unable to save customer.' });
+  }
+});
+
+
+app.patch('/api/customers/:id', requireSupabaseUser, async (req, res) => {
+  const rawId = req.params.id;
+  if (
+    typeof rawId !== 'string' ||
+    !/^\d+$/.test(rawId) ||
+    !Number.isSafeInteger(Number(rawId))
+  ) {
+    res.status(400).json({ error: 'Invalid customer ID.' });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  const businessName = typeof body.businessName === 'string' ? body.businessName.trim() : '';
+  const contactName = typeof body.contactName === 'string' ? body.contactName.trim() : '';
+  const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+  const gstin = typeof body.gstin === 'string' ? body.gstin.trim().toUpperCase() : '';
+  const billingAddress = typeof body.billingAddress === 'string' ? body.billingAddress.trim() : '';
+  const state = typeof body.state === 'string' ? body.state.trim() : '';
+  const customerType = ['Retailer', 'Wholesaler', 'Other'].includes(String(body.customerType)) ? String(body.customerType) : 'Retailer';
+
+  if (!businessName || !contactName || !phone || businessName.length > 200 || contactName.length > 200 || phone.length > 40 || gstin.length > 15 || billingAddress.length > 1000 || state.length > 100) {
+    res.status(400).json({ error: 'Enter a valid business name, contact name and phone number.' });
+    return;
+  }
+  if (gstin && !/^[0-9A-Z]{15}$/.test(gstin)) {
+    res.status(400).json({ error: 'GSTIN must contain 15 letters/numbers.' });
+    return;
+  }
+
+  try {
+    const duplicate = await pool.query(
+      `SELECT id FROM public.customers
+       WHERE id <> $1 AND ((phone = $2 AND lower(business_name) = lower($3)) OR ($4 <> '' AND gstin = $4))
+       LIMIT 1`,
+      [Number(rawId), phone, businessName, gstin],
+    );
+    if (duplicate.rowCount) {
+      res.status(409).json({ error: 'Another customer already uses this business name and phone, or this GSTIN.' });
+      return;
+    }
+    const result = await pool.query(
+      `UPDATE public.customers
+       SET business_name = $2, contact_name = $3, phone = $4, gstin = NULLIF($5, ''),
+           billing_address = NULLIF($6, ''), state = NULLIF($7, ''), customer_type = $8, updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, business_name AS "businessName", contact_name AS "contactName", phone, gstin,
+                 billing_address AS "billingAddress", state, customer_type AS "customerType"`,
+      [Number(rawId), businessName, contactName, phone, gstin, billingAddress, state, customerType],
+    );
+    if (!result.rowCount) {
+      res.status(404).json({ error: 'Customer not found.' });
+      return;
+    }
+    res.json({ success: true, customer: result.rows[0] });
+  } catch (error) {
+    const pgError = error as { code?: string };
+    console.error('Customer update failed:', error instanceof Error ? error.message : error);
+    if (pgError.code === '42P01') {
+      res.status(503).json({ error: 'Customer tables are not installed yet. Run npm.cmd run migrate from the backend folder.' });
+      return;
+    }
+    res.status(500).json({ error: 'Unable to update customer.' });
+  }
+});
+
+app.post('/api/quotations', requireSupabaseUser, async (req, res) => {
+  const user = res.locals.authenticatedUser as AuthenticatedUser;
+  const body = req.body as Record<string, unknown>;
+  const number = typeof body.quotationNumber === 'string' ? body.quotationNumber.trim() : '';
+  const items = Array.isArray(body.items) ? body.items : [];
+  const customer = body.customer && typeof body.customer === 'object' ? body.customer : null;
+  const supplier = body.supplier && typeof body.supplier === 'object' ? body.supplier : {};
+  const settings = body.settings && typeof body.settings === 'object' ? body.settings : {};
+  const subtotal = Number(body.subtotal);
+  const discountTotal = Number(body.discountTotal ?? 0);
+  const taxableValue = Number(body.taxableValue ?? subtotal - discountTotal);
+  const taxTotal = Number(body.taxTotal ?? 0);
+  const roundOff = Number(body.roundOff ?? 0);
+  const grandTotal = Number(body.grandTotal);
+
+  if (!number || number.length > 80 || !customer || items.length === 0 || items.length > 500 ||
+      ![subtotal, discountTotal, taxableValue, taxTotal, roundOff, grandTotal].every(Number.isFinite) ||
+      [subtotal, discountTotal, taxableValue, taxTotal, grandTotal].some((n) => n < 0)) {
+    res.status(400).json({ error: 'Quotation details are incomplete or invalid.' });
+    return;
+  }
+
+  try {
+    const rawCustomerId = customer ? (customer as Record<string, unknown>).id : null;
+    const customerId = typeof rawCustomerId === 'number' && Number.isSafeInteger(rawCustomerId)
+      ? rawCustomerId
+      : typeof rawCustomerId === 'string' && /^\d+$/.test(rawCustomerId)
+        ? rawCustomerId
+        : null;
+    const result = await pool.query(
+      `INSERT INTO public.quotations
+        (quotation_number, customer_id, customer_snapshot, supplier_snapshot, items, settings, subtotal, discount_total,
+         taxable_value, tax_total, round_off, grand_total, status, created_by)
+       VALUES ($1,$2,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb,$7,$8,$9,$10,$11,$12,$13,$14)
+       ON CONFLICT (quotation_number) DO UPDATE SET
+         customer_id = EXCLUDED.customer_id,
+         customer_snapshot = EXCLUDED.customer_snapshot,
+         supplier_snapshot = EXCLUDED.supplier_snapshot,
+         items = EXCLUDED.items,
+         settings = EXCLUDED.settings,
+         subtotal = EXCLUDED.subtotal,
+         discount_total = EXCLUDED.discount_total,
+         taxable_value = EXCLUDED.taxable_value,
+         tax_total = EXCLUDED.tax_total,
+         round_off = EXCLUDED.round_off,
+         grand_total = EXCLUDED.grand_total,
+         status = EXCLUDED.status,
+         updated_at = NOW()
+       WHERE public.quotations.created_by = EXCLUDED.created_by
+       RETURNING id, quotation_number AS "quotationNumber", status, created_at AS "createdAt"`,
+      [number, customerId, JSON.stringify(customer), JSON.stringify(supplier), JSON.stringify(items), JSON.stringify(settings),
+       subtotal, discountTotal, taxableValue, taxTotal, roundOff, grandTotal,
+       body.status === 'Generated' ? 'Generated' : 'Draft', user.id],
+    );
+    if (!result.rowCount) {
+      res.status(409).json({ error: 'This quotation number belongs to another user. Use a different number.' });
+      return;
+    }
+    res.status(201).json({ success: true, quotation: result.rows[0] });
+  } catch (error) {
+    const pgError = error as { code?: string };
+    if (pgError.code === '23505') {
+      res.status(409).json({ error: 'This quotation number already exists. Use a different number.' });
+      return;
+    }
+    console.error('Quotation save failed:', error instanceof Error ? error.message : error);
+    res.status(500).json({ error: 'Unable to save quotation.' });
+  }
+});
+
+// -----------------------------------------------------------------------------
 // Start server and handle shutdown
 // -----------------------------------------------------------------------------
 

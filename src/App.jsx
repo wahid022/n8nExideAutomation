@@ -8,6 +8,7 @@ import {
 
 import Dashboard from "./pages/Dashboard";
 import Quotation from "./pages/Quotation";
+import Customers from "./pages/Customers";
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
@@ -42,6 +43,11 @@ export default function App() {
                     onNavigate={() => {}}
                   />
                 }
+              />
+
+              <Route
+                path="/customers"
+                element={<Customers activePage="Customers" />}
               />
             </Route>
 
