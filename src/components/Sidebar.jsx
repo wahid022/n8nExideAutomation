@@ -5,6 +5,9 @@ const navItems = [
   { icon: "▦", label: "Dashboard", path: "/dashboard" },
   { icon: "▤", label: "Quotation", path: "/quotation" },
   { icon: "♙", label: "Customers", path: "/customers" },
+  { icon: "▣", label: "Sales", path: "/sales" },
+  { icon: "⇄", label: "Sales Operations", path: "/sales-operations" },
+  { icon: "₹", label: "Sales", path: "/sales" },
 ];
 
 export default function Sidebar({ activePage }) {

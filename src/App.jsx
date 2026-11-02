@@ -9,6 +9,8 @@ import {
 import Dashboard from "./pages/Dashboard";
 import Quotation from "./pages/Quotation";
 import Customers from "./pages/Customers";
+import Sales from "./pages/Sales";
+import SalesOperations from "./pages/SalesOperations";
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
@@ -48,6 +50,16 @@ export default function App() {
               <Route
                 path="/customers"
                 element={<Customers activePage="Customers" />}
+              />
+
+              <Route
+                path="/sales"
+                element={<Sales activePage="Sales" />}
+              />
+
+              <Route
+                path="/sales-operations"
+                element={<SalesOperations />}
               />
             </Route>
 
