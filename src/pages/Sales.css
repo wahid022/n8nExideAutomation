@@ -55,3 +55,152 @@
   color: #64748b;
   font-size: 12px;
 }
+
+
+/* Sales Order Details */
+
+.sales-view-button {
+  padding: 7px 11px;
+  border: 1px solid #d5dfec;
+  border-radius: 7px;
+  background: #f8faff;
+  color: #155eef;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sales-view-button:hover {
+  background: #eef4ff;
+  border-color: #a9c5ff;
+}
+
+.sales-order-details-modal {
+  width: min(1150px, 100%);
+}
+
+.sales-details-section {
+  margin-bottom: 22px;
+}
+
+.sales-details-section h3,
+.sales-details-notes h3 {
+  margin: 0 0 13px;
+  font-size: 14px;
+  color: #17294a;
+}
+
+.sales-details-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 13px;
+}
+
+.sales-details-heading h3 {
+  margin: 0;
+}
+
+.sales-details-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sales-details-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: #f8faff;
+  border: 1px solid #e6edf7;
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.sales-details-grid span {
+  font-size: 10px;
+  color: #72809a;
+}
+
+.sales-details-grid strong {
+  font-size: 12px;
+  color: #17294a;
+  overflow-wrap: anywhere;
+}
+
+.sales-details-full {
+  grid-column: 1 / -1;
+}
+
+.sales-details-table-wrap {
+  border: 1px solid #e6edf7;
+  border-radius: 9px;
+}
+
+.sales-details-table {
+  min-width: 950px;
+}
+
+.sales-details-table td small,
+.sales-item-subtitle {
+  display: block;
+  margin-top: 4px;
+  color: #72809a;
+  font-size: 10px;
+}
+
+.sales-details-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 360px);
+  gap: 25px;
+  align-items: start;
+  padding-top: 10px;
+}
+
+.sales-details-notes p {
+  margin: 0;
+  color: #63718a;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.sales-details-totals {
+  padding-top: 0;
+}
+
+.sales-details-footer {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #e8edf4;
+  padding-top: 15px;
+  margin-top: 20px;
+}
+
+@media (max-width: 800px) {
+  .sales-details-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sales-details-bottom {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .sales-details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sales-details-full {
+    grid-column: auto;
+  }
+
+  .sales-details-heading {
+    align-items: flex-start;
+  }
+}
+
