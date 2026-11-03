@@ -440,28 +440,28 @@ function OrderDetailsModal({ order, onClose, onEdit }) {
 
         aria-labelledby="order-details-title"
 
-      > 
+      >
         <div className="sales-print-document">
           <div className="print-company"><h1>BHARAT BATTERIES</h1><p>SALES ORDER</p></div>
           <div className="print-order-meta">
-            <div><span>Order No.</span><strong>{order.orderNumber || `Order #${ order.id }`}</strong></div>
+            <div><span>Order No.</span><strong>{order.orderNumber || `Order #${order.id}`}</strong></div>
             <div><span>Order Date</span><strong>{formatDate(order.orderDate || order.createdAt)}</strong></div>
             <div><span>Status</span><strong>{order.status || "Pending"}</strong></div>
           </div>
           <h3>Bill To</h3>
           <div className="print-customer"><strong>{customer.businessName || customer.name || "—"}</strong>
-            <div>{customer.contactPerson || ""}</div><div>{customer.phone || ""}{customer.email ? ` · ${ customer.email }` : ""}</div>
-            <div>{[customer.address,customer.city,customer.state,customer.pincode].filter(Boolean).join(", ")}</div>
+            <div>{customer.contactPerson || ""}</div><div>{customer.phone || ""}{customer.email ? ` · ${customer.email}` : ""}</div>
+            <div>{[customer.address, customer.city, customer.state, customer.pincode].filter(Boolean).join(", ")}</div>
             {customer.gstin && <div>GSTIN: {customer.gstin}</div>}
           </div>
           <table className="print-items"><thead><tr><th>#</th><th>Product</th><th>Code</th><th>Qty</th><th>Unit price</th><th>Discount</th><th>GST</th><th>Total</th></tr></thead>
-          <tbody>{items.map((item,index)=>{const q=Number(item.quantity||0),p=Number(item.unitPrice??item.dealerPrice??0),d=Number(item.discountPercent||0),t=Number(item.taxPercent??18),g=q*p,da=g*d/100,taxableLine=g-da,ga=taxableLine*t/100;return <tr key={`${ item.productId || item.productCode || index } - ${ index }`}><td>{index+1}</td><td>{item.productName||item.name||"—"}</td><td>{item.productCode||"—"}</td><td>{q}</td><td>{money(p)}</td><td>{d}% ({money(da)})</td><td>{t}% ({money(ga)})</td><td>{money(item.lineTotal??taxableLine+ga)}</td></tr>;})}</tbody></table>
+            <tbody>{items.map((item, index) => { const q = Number(item.quantity || 0), p = Number(item.unitPrice ?? item.dealerPrice ?? 0), d = Number(item.discountPercent || 0), t = Number(item.taxPercent ?? 18), g = q * p, da = g * d / 100, taxableLine = g - da, ga = taxableLine * t / 100; return <tr key={`${item.productId || item.productCode || index} - ${index}`}><td>{index + 1}</td><td>{item.productName || item.name || "—"}</td><td>{item.productCode || "—"}</td><td>{q}</td><td>{money(p)}</td><td>{d}% ({money(da)})</td><td>{t}% ({money(ga)})</td><td>{money(item.lineTotal ?? taxableLine + ga)}</td></tr>; })}</tbody></table>
           <div className="print-total-area"><div><span>Subtotal</span><b>{money(subtotal)}</b></div><div><span>Discount</span><b>{money(discount)}</b></div><div><span>Taxable value</span><b>{money(taxable)}</b></div><div><span>GST</span><b>{money(tax)}</b></div><div className="print-grand"><span>Grand total</span><b>{money(total)}</b></div></div>
           {order.notes && <div className="print-notes"><strong>Notes:</strong> {order.notes}</div>}
-          <div className="print-signatures"><div>Customer Signature</div><div>For BHARAT BATTERIES<br/><br/>Authorised Signatory</div></div>
+          <div className="print-signatures"><div>Customer Signature</div><div>For BHARAT BATTERIES<br /><br />Authorised Signatory</div></div>
           <p className="print-footer">Computer-generated sales order.</p>
         </div>
-        
+
 
         <header>
 
@@ -1118,7 +1118,7 @@ export default function Sales({ activePage = "Sales" }) {
 
       documentNumber: `${tab === "Orders" ? "SO" : tab === "Invoices" ? "INV" : "RCPT"
 
-    }-${Date.now().toString().slice(-8)}`,
+        }-${Date.now().toString().slice(-8)}`,
 
       customerId: customers[0] ? String(customers[0].id) : "",
 
@@ -1159,13 +1159,13 @@ export default function Sales({ activePage = "Sales" }) {
     const legacyItems = Array.isArray(order.items) ? order.items : [];
     const items = legacyItems.length
       ? legacyItems.map((item) => ({
-          ...emptyLine(),
-          ...item,
-          quantity: item.quantity ?? 1,
-          unitPrice: item.unitPrice ?? item.dealerPrice ?? 0,
-          discountPercent: item.discountPercent ?? 0,
-          taxPercent: item.taxPercent ?? 18,
-        }))
+        ...emptyLine(),
+        ...item,
+        quantity: item.quantity ?? 1,
+        unitPrice: item.unitPrice ?? item.dealerPrice ?? 0,
+        discountPercent: item.discountPercent ?? 0,
+        taxPercent: item.taxPercent ?? 18,
+      }))
       : [emptyLine()];
 
     setEditingOrder(order);
@@ -1320,7 +1320,12 @@ export default function Sales({ activePage = "Sales" }) {
 
 
 
-  const tabs = ["Orders", "Invoices", "Payments"];
+  const tabs =
+    activePage === "Sales Order"
+      ? ["Orders"]
+      : activePage === "Sales Invoice"
+        ? ["Invoices", "Payments"]
+        : ["Orders", "Invoices", "Payments"];
 
 
 
@@ -1408,7 +1413,7 @@ export default function Sales({ activePage = "Sales" }) {
 
               <span className="sales-eyebrow">BUSINESS MANAGEMENT</span>
 
-              <h1>Sales</h1>
+              <h1>{activePage}</h1>
 
               <p>
 
@@ -1442,61 +1447,6 @@ export default function Sales({ activePage = "Sales" }) {
 
 
 
-          {notice && <div className="sales-notice">{notice}</div>}
-
-          {error && !modal && <div className="sales-error">{error}</div>}
-
-
-
-          <section className="sales-stats">
-
-            <article>
-
-              <span>Sales orders</span>
-
-              <strong>{summary?.orders?.count ?? "—"}</strong>
-
-              <small>{money(summary?.orders?.value)} order value</small>
-
-            </article>
-
-
-
-            <article>
-
-              <span>Invoices</span>
-
-              <strong>{summary?.invoices?.count ?? "—"}</strong>
-
-              <small>{money(summary?.invoices?.value)} invoice value</small>
-
-            </article>
-
-
-
-            <article>
-
-              <span>Payments received</span>
-
-              <strong>{money(summary?.payments?.received)}</strong>
-
-              <small>Recorded receipts</small>
-
-            </article>
-
-
-
-            <article>
-
-              <span>Outstanding</span>
-
-              <strong>{money(summary?.invoices?.outstanding)}</strong>
-
-              <small>Invoices less received payments</small>
-
-            </article>
-
-          </section>
 
 
 
@@ -1814,47 +1764,47 @@ export default function Sales({ activePage = "Sales" }) {
 
           </section>
 
-        </div>
+        </div >
 
-      </main>
+      </main >
 
 
 
-      {modal && (
+    { modal && (
 
-        <div
+      <div
 
-          className="sales-modal-backdrop"
+        className="sales-modal-backdrop"
 
-          role="presentation"
+        role="presentation"
 
-          onMouseDown={(e) => {
+        onMouseDown={(e) => {
 
-            if (e.target === e.currentTarget) setModal(false);
+          if (e.target === e.currentTarget) setModal(false);
 
-          }}
+        }}
+
+      >
+
+        <section
+
+          className="sales-modal"
+
+          role="dialog"
+
+          aria-modal="true"
+
+          aria-labelledby="sales-modal-title"
 
         >
 
-          <section
+          <header>
 
-            className="sales-modal"
+            <div>
 
-            role="dialog"
+              <h2 id="sales-modal-title">
 
-            aria-modal="true"
-
-            aria-labelledby="sales-modal-title"
-
-          >
-
-            <header>
-
-              <div>
-
-                <h2 id="sales-modal-title">
-
-                  {editingOrder ? "Edit Draft Sales Order" : <>New{" "}
+                {editingOrder ? "Edit Draft Sales Order" : <>New{" "}
 
                   {tab === "Orders"
 
@@ -1866,153 +1816,179 @@ export default function Sales({ activePage = "Sales" }) {
 
                       : "customer payment"}</>}
 
-                </h2>
+              </h2>
 
-                <p>Totals are calculated and validated by the backend.</p>
+              <p>Totals are calculated and validated by the backend.</p>
 
-              </div>
+            </div>
 
 
 
-              <button
+            <button
 
-                type="button"
+              type="button"
 
-                className="sales-close"
+              className="sales-close"
 
-                onClick={() => setModal(false)}
+              onClick={() => setModal(false)}
 
-                aria-label="Close"
+              aria-label="Close"
+
+            >
+
+              ×
+
+            </button>
+
+          </header>
+
+
+
+          {error && <div className="sales-error">{error}</div>}
+
+
+
+          <form onSubmit={save} className="sales-form">
+
+            <label>
+
+              {tab === "Orders"
+
+                ? "Order number"
+
+                : tab === "Invoices"
+
+                  ? "Invoice number"
+
+                  : "Receipt number"}
+
+
+
+              <input
+
+                required
+
+                maxLength="80"
+
+                disabled={Boolean(editingOrder)}
+
+                value={form.documentNumber}
+
+                onChange={(e) =>
+
+                  setForm({
+
+                    ...form,
+
+                    documentNumber: e.target.value,
+
+                  })
+
+                }
+
+              />
+
+            </label>
+
+
+
+            <label>
+
+              Customer
+
+              <select
+
+                required
+
+                value={form.customerId}
+
+                onChange={(e) =>
+
+                  setForm({
+
+                    ...form,
+
+                    customerId: e.target.value,
+
+                    invoiceId: "",
+
+                  })
+
+                }
 
               >
 
-                ×
-
-              </button>
-
-            </header>
+                <option value="">Choose customer</option>
 
 
 
-            {error && <div className="sales-error">{error}</div>}
+                {customers.map((c) => (
+
+                  <option key={c.id} value={c.id}>
+
+                    {c.businessName} — {c.phone}
+
+                  </option>
+
+                ))}
+
+              </select>
+
+            </label>
 
 
 
-            <form onSubmit={save} className="sales-form">
+            <label>
 
-              <label>
+              {tab === "Invoices"
 
-                {tab === "Orders"
+                ? "Invoice date"
 
-                  ? "Order number"
+                : tab === "Payments"
 
-                  : tab === "Invoices"
+                  ? "Payment date"
 
-                    ? "Invoice number"
-
-                    : "Receipt number"}
+                  : "Order date"}
 
 
 
-                <input
+              <input
 
-                  required
+                type="date"
 
-                  maxLength="80"
+                required
 
-                  disabled={Boolean(editingOrder)}
+                value={form.date}
 
-                  value={form.documentNumber}
+                onChange={(e) =>
 
-                  onChange={(e) =>
+                  setForm({ ...form, date: e.target.value })
 
-                    setForm({
+                }
 
-                      ...form,
+              />
 
-                      documentNumber: e.target.value,
-
-                    })
-
-                  }
-
-                />
-
-              </label>
+            </label>
 
 
 
-              <label>
-
-                Customer
-
-                <select
-
-                  required
-
-                  value={form.customerId}
-
-                  onChange={(e) =>
-
-                    setForm({
-
-                      ...form,
-
-                      customerId: e.target.value,
-
-                      invoiceId: "",
-
-                    })
-
-                  }
-
-                >
-
-                  <option value="">Choose customer</option>
-
-
-
-                  {customers.map((c) => (
-
-                    <option key={c.id} value={c.id}>
-
-                      {c.businessName} — {c.phone}
-
-                    </option>
-
-                  ))}
-
-                </select>
-
-              </label>
-
-
+            {tab === "Invoices" && (
 
               <label>
 
-                {tab === "Invoices"
-
-                  ? "Invoice date"
-
-                  : tab === "Payments"
-
-                    ? "Payment date"
-
-                    : "Order date"}
-
-
+                Due date
 
                 <input
 
                   type="date"
 
-                  required
+                  min={form.date}
 
-                  value={form.date}
+                  value={form.dueDate}
 
                   onChange={(e) =>
 
-                    setForm({ ...form, date: e.target.value })
+                    setForm({ ...form, dueDate: e.target.value })
 
                   }
 
@@ -2020,25 +1996,91 @@ export default function Sales({ activePage = "Sales" }) {
 
               </label>
 
+            )}
 
 
-              {tab === "Invoices" && (
+
+            {tab === "Payments" ? (
+
+              <>
 
                 <label>
 
-                  Due date
+                  Invoice (optional)
 
-                  <input
+                  <select
 
-                    type="date"
-
-                    min={form.date}
-
-                    value={form.dueDate}
+                    value={form.invoiceId}
 
                     onChange={(e) =>
 
-                      setForm({ ...form, dueDate: e.target.value })
+                      setForm({ ...form, invoiceId: e.target.value })
+
+                    }
+
+                  >
+
+                    <option value="">Unallocated payment</option>
+
+
+
+                    {invoices
+
+                      .filter(
+
+                        (i) =>
+
+                          String(i.customer?.id) ===
+
+                          String(form.customerId) &&
+
+                          !["Paid", "Void"].includes(i.status)
+
+                      )
+
+                      .map((i) => (
+
+                        <option key={i.id} value={i.id}>
+
+                          {i.invoiceNumber} — balance{" "}
+
+                          {money(
+
+                            Number(i.grandTotal) -
+
+                            Number(i.amountPaid)
+
+                          )}
+
+                        </option>
+
+                      ))}
+
+                  </select>
+
+                </label>
+
+
+
+                <label>
+
+                  Amount (₹)
+
+                  <input
+
+                    type="number"
+
+                    min="0.01"
+
+                    step="0.01"
+
+                    required
+
+                    value={form.amount}
+
+                    onChange={(e) =>
+
+                      setForm({ ...form, amount: e.target.value })
 
                     }
 
@@ -2046,601 +2088,512 @@ export default function Sales({ activePage = "Sales" }) {
 
                 </label>
 
-              )}
 
 
+                <label>
 
-              {tab === "Payments" ? (
+                  Payment method
 
-                <>
+                  <select
 
-                  <label>
+                    value={form.paymentMethod}
 
-                    Invoice (optional)
+                    onChange={(e) =>
 
-                    <select
+                      setForm({
 
-                      value={form.invoiceId}
+                        ...form,
 
-                      onChange={(e) =>
+                        paymentMethod: e.target.value,
 
-                        setForm({ ...form, invoiceId: e.target.value })
+                      })
 
-                      }
+                    }
 
-                    >
+                  >
 
-                      <option value="">Unallocated payment</option>
+                    {[
 
+                      "Cash",
 
+                      "UPI",
 
-                      {invoices
+                      "Bank Transfer",
 
-                        .filter(
+                      "Cheque",
 
-                          (i) =>
+                      "Card",
 
-                            String(i.customer?.id) ===
+                      "Other",
 
-                            String(form.customerId) &&
+                    ].map((m) => (
 
-                            !["Paid", "Void"].includes(i.status)
+                      <option key={m}>{m}</option>
 
-                        )
+                    ))}
 
-                        .map((i) => (
+                  </select>
 
-                          <option key={i.id} value={i.id}>
+                </label>
 
-                            {i.invoiceNumber} — balance{" "}
 
-                            {money(
 
-                              Number(i.grandTotal) -
+                <label>
 
-                              Number(i.amountPaid)
+                  Reference number
 
-                            )}
+                  <input
 
-                          </option>
+                    maxLength="120"
 
-                        ))}
+                    value={form.referenceNumber}
 
-                    </select>
+                    onChange={(e) =>
 
-                  </label>
+                      setForm({
 
+                        ...form,
 
+                        referenceNumber: e.target.value,
 
-                  <label>
+                      })
 
-                    Amount (₹)
+                    }
 
-                    <input
+                  />
 
-                      type="number"
+                </label>
 
-                      min="0.01"
+              </>
 
-                      step="0.01"
+            ) : (
 
-                      required
+              <div className="sales-line-items">
 
-                      value={form.amount}
+                <div className="sales-line-heading">
 
-                      onChange={(e) =>
+                  <strong>Items</strong>
 
-                        setForm({ ...form, amount: e.target.value })
 
-                      }
 
-                    />
+                  <button
 
-                  </label>
+                    type="button"
 
+                    className="sales-secondary"
 
+                    onClick={() =>
 
-                  <label>
+                      setForm({
 
-                    Payment method
+                        ...form,
 
-                    <select
+                        items: [...form.items, emptyLine()],
 
-                      value={form.paymentMethod}
+                      })
 
-                      onChange={(e) =>
+                    }
 
-                        setForm({
+                  >
 
-                          ...form,
+                    ＋ Add item
 
-                          paymentMethod: e.target.value,
-
-                        })
-
-                      }
-
-                    >
-
-                      {[
-
-                        "Cash",
-
-                        "UPI",
-
-                        "Bank Transfer",
-
-                        "Cheque",
-
-                        "Card",
-
-                        "Other",
-
-                      ].map((m) => (
-
-                        <option key={m}>{m}</option>
-
-                      ))}
-
-                    </select>
-
-                  </label>
-
-
-
-                  <label>
-
-                    Reference number
-
-                    <input
-
-                      maxLength="120"
-
-                      value={form.referenceNumber}
-
-                      onChange={(e) =>
-
-                        setForm({
-
-                          ...form,
-
-                          referenceNumber: e.target.value,
-
-                        })
-
-                      }
-
-                    />
-
-                  </label>
-
-                </>
-
-              ) : (
-
-                <div className="sales-line-items">
-
-                  <div className="sales-line-heading">
-
-                    <strong>Items</strong>
-
-
-
-                    <button
-
-                      type="button"
-
-                      className="sales-secondary"
-
-                      onClick={() =>
-
-                        setForm({
-
-                          ...form,
-
-                          items: [...form.items, emptyLine()],
-
-                        })
-
-                      }
-
-                    >
-
-                      ＋ Add item
-
-                    </button>
-
-                  </div>
-
-
-
-                  {form.items.map((line, index) => (
-
-                    <div className="sales-line" key={index}>
-
-                      <label>
-
-                        Product / Catalogue
-
-
-
-                        <ProductPicker
-
-                          line={line}
-
-                          onChange={(updatedLine) =>
-
-                            setForm({
-
-                              ...form,
-
-                              items: form.items.map((item, i) =>
-
-                                i === index ? updatedLine : item
-
-                              ),
-
-                            })
-
-                          }
-
-                        />
-
-                      </label>
-
-
-
-                      <label>
-
-                        Qty
-
-                        <input
-
-                          type="number"
-
-                          min="0.001"
-
-                          step="0.001"
-
-                          required
-
-                          value={line.quantity}
-
-                          onChange={(e) =>
-
-                            setForm({
-
-                              ...form,
-
-                              items: form.items.map((item, i) =>
-
-                                i === index
-
-                                  ? {
-
-                                    ...item,
-
-                                    quantity: e.target.value,
-
-                                  }
-
-                                  : item
-
-                              ),
-
-                            })
-
-                          }
-
-                        />
-
-                      </label>
-
-
-
-                      <label>
-
-                        Unit price ₹
-
-                        <input
-
-                          type="number"
-
-                          min="0"
-
-                          step="0.01"
-
-                          required
-
-                          value={line.unitPrice}
-
-                          onChange={(e) =>
-
-                            setForm({
-
-                              ...form,
-
-                              items: form.items.map((item, i) =>
-
-                                i === index
-
-                                  ? {
-
-                                    ...item,
-
-                                    unitPrice: e.target.value,
-
-                                  }
-
-                                  : item
-
-                              ),
-
-                            })
-
-                          }
-
-                        />
-
-                      </label>
-
-
-
-                      <label>
-
-                        Discount %
-
-                        <input
-
-                          type="number"
-
-                          min="0"
-
-                          max="100"
-
-                          step="0.01"
-
-                          value={line.discountPercent}
-
-                          onChange={(e) =>
-
-                            setForm({
-
-                              ...form,
-
-                              items: form.items.map((item, i) =>
-
-                                i === index
-
-                                  ? {
-
-                                    ...item,
-
-                                    discountPercent: e.target.value,
-
-                                  }
-
-                                  : item
-
-                              ),
-
-                            })
-
-                          }
-
-                        />
-
-                      </label>
-
-
-
-                      <label>
-
-                        GST %
-
-                        <input
-
-                          type="number"
-
-                          min="0"
-
-                          max="100"
-
-                          step="0.01"
-
-                          value={line.taxPercent}
-
-                          onChange={(e) =>
-
-                            setForm({
-
-                              ...form,
-
-                              items: form.items.map((item, i) =>
-
-                                i === index
-
-                                  ? {
-
-                                    ...item,
-
-                                    taxPercent: e.target.value,
-
-                                  }
-
-                                  : item
-
-                              ),
-
-                            })
-
-                          }
-
-                        />
-
-                      </label>
-
-
-
-                      {form.items.length > 1 && (
-
-                        <button
-
-                          type="button"
-
-                          className="sales-remove"
-
-                          onClick={() =>
-
-                            setForm({
-
-                              ...form,
-
-                              items: form.items.filter(
-
-                                (_, i) => i !== index
-
-                              ),
-
-                            })
-
-                          }
-
-                        >
-
-                          Remove
-
-                        </button>
-
-                      )}
-
-                    </div>
-
-                  ))}
-
-
-
-                  <div className="sales-totals">
-
-                    <span>
-
-                      Subtotal <b>{money(totals.subtotal)}</b>
-
-                    </span>
-
-
-
-                    <span>
-
-                      Discount <b>{money(totals.discount)}</b>
-
-                    </span>
-
-
-
-                    <span>
-
-                      Tax <b>{money(totals.tax)}</b>
-
-                    </span>
-
-
-
-                    <span className="sales-grand-total">
-
-                      Total <b>{money(totals.total)}</b>
-
-                    </span>
-
-                  </div>
+                  </button>
 
                 </div>
 
-              )}
+
+
+                {form.items.map((line, index) => (
+
+                  <div className="sales-line" key={index}>
+
+                    <label>
+
+                      Product / Catalogue
 
 
 
-              <label className="sales-form-wide">
+                      <ProductPicker
 
-                Notes
+                        line={line}
 
-                <textarea
+                        onChange={(updatedLine) =>
 
-                  rows="2"
+                          setForm({
 
-                  maxLength="2000"
+                            ...form,
 
-                  value={form.notes}
+                            items: form.items.map((item, i) =>
 
-                  onChange={(e) =>
+                              i === index ? updatedLine : item
 
-                    setForm({ ...form, notes: e.target.value })
+                            ),
 
-                  }
+                          })
 
-                />
+                        }
 
-              </label>
+                      />
 
-
-
-              <footer className="sales-form-actions">
-
-                <button
-
-                  type="button"
-
-                  className="sales-secondary"
-
-                  onClick={() => setModal(false)}
-
-                >
-
-                  Cancel
-
-                </button>
+                    </label>
 
 
 
-                <button
+                    <label>
 
-                  className="sales-primary"
+                      Qty
 
-                  disabled={saving || !customers.length}
+                      <input
 
-                >
+                        type="number"
 
-                  {saving ? "Saving…" : editingOrder ? "Update Draft" : "Save record"}
+                        min="0.001"
 
-                </button>
+                        step="0.001"
 
-              </footer>
+                        required
 
-            </form>
+                        value={line.quantity}
 
-          </section>
+                        onChange={(e) =>
 
-        </div>
+                          setForm({
 
-      )}
+                            ...form,
+
+                            items: form.items.map((item, i) =>
+
+                              i === index
+
+                                ? {
+
+                                  ...item,
+
+                                  quantity: e.target.value,
+
+                                }
+
+                                : item
+
+                            ),
+
+                          })
+
+                        }
+
+                      />
+
+                    </label>
 
 
 
-      {viewOrder && (
+                    <label>
 
-        <OrderDetailsModal
+                      Unit price ₹
 
-          order={viewOrder}
+                      <input
 
-          onClose={() => setViewOrder(null)}
+                        type="number"
 
-          onEdit={openEditOrder}
+                        min="0"
 
-        />
+                        step="0.01"
 
-      )}
+                        required
 
-    </div>
+                        value={line.unitPrice}
+
+                        onChange={(e) =>
+
+                          setForm({
+
+                            ...form,
+
+                            items: form.items.map((item, i) =>
+
+                              i === index
+
+                                ? {
+
+                                  ...item,
+
+                                  unitPrice: e.target.value,
+
+                                }
+
+                                : item
+
+                            ),
+
+                          })
+
+                        }
+
+                      />
+
+                    </label>
+
+
+
+                    <label>
+
+                      Discount %
+
+                      <input
+
+                        type="number"
+
+                        min="0"
+
+                        max="100"
+
+                        step="0.01"
+
+                        value={line.discountPercent}
+
+                        onChange={(e) =>
+
+                          setForm({
+
+                            ...form,
+
+                            items: form.items.map((item, i) =>
+
+                              i === index
+
+                                ? {
+
+                                  ...item,
+
+                                  discountPercent: e.target.value,
+
+                                }
+
+                                : item
+
+                            ),
+
+                          })
+
+                        }
+
+                      />
+
+                    </label>
+
+
+
+                    <label>
+
+                      GST %
+
+                      <input
+
+                        type="number"
+
+                        min="0"
+
+                        max="100"
+
+                        step="0.01"
+
+                        value={line.taxPercent}
+
+                        onChange={(e) =>
+
+                          setForm({
+
+                            ...form,
+
+                            items: form.items.map((item, i) =>
+
+                              i === index
+
+                                ? {
+
+                                  ...item,
+
+                                  taxPercent: e.target.value,
+
+                                }
+
+                                : item
+
+                            ),
+
+                          })
+
+                        }
+
+                      />
+
+                    </label>
+
+
+
+                    {form.items.length > 1 && (
+
+                      <button
+
+                        type="button"
+
+                        className="sales-remove"
+
+                        onClick={() =>
+
+                          setForm({
+
+                            ...form,
+
+                            items: form.items.filter(
+
+                              (_, i) => i !== index
+
+                            ),
+
+                          })
+
+                        }
+
+                      >
+
+                        Remove
+
+                      </button>
+
+                    )}
+
+                  </div>
+
+                ))}
+
+
+
+                <div className="sales-totals">
+
+                  <span>
+
+                    Subtotal <b>{money(totals.subtotal)}</b>
+
+                  </span>
+
+
+
+                  <span>
+
+                    Discount <b>{money(totals.discount)}</b>
+
+                  </span>
+
+
+
+                  <span>
+
+                    Tax <b>{money(totals.tax)}</b>
+
+                  </span>
+
+
+
+                  <span className="sales-grand-total">
+
+                    Total <b>{money(totals.total)}</b>
+
+                  </span>
+
+                </div>
+
+              </div>
+
+            )}
+
+
+
+            <label className="sales-form-wide">
+
+              Notes
+
+              <textarea
+
+                rows="2"
+
+                maxLength="2000"
+
+                value={form.notes}
+
+                onChange={(e) =>
+
+                  setForm({ ...form, notes: e.target.value })
+
+                }
+
+              />
+
+            </label>
+
+
+
+            <footer className="sales-form-actions">
+
+              <button
+
+                type="button"
+
+                className="sales-secondary"
+
+                onClick={() => setModal(false)}
+
+              >
+
+                Cancel
+
+              </button>
+
+
+
+              <button
+
+                className="sales-primary"
+
+                disabled={saving || !customers.length}
+
+              >
+
+                {saving ? "Saving…" : editingOrder ? "Update Draft" : "Save record"}
+
+              </button>
+
+            </footer>
+
+          </form>
+
+        </section>
+
+      </div>
+
+    )
+}
+
+
+
+{
+  viewOrder && (
+
+    <OrderDetailsModal
+
+      order={viewOrder}
+
+      onClose={() => setViewOrder(null)}
+
+      onEdit={openEditOrder}
+
+    />
+
+  )
+}
+
+    </div >
 
   );
 
