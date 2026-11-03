@@ -902,6 +902,9 @@ function buildSalesLines(raw: unknown) {
         ? Number(item.productId)
         : null,
       productName: name,
+      unitPrice: Number(unitPrice.toFixed(2)),
+      discountPercent: Number(discountPercent.toFixed(2)),
+      taxPercent: Number(taxPercent.toFixed(2)),
       productCode: typeof item.productCode === 'string'
         ? item.productCode.slice(0, 100)
         : '',
@@ -993,6 +996,119 @@ app.post('/api/sales/orders', requireSupabaseUser, async (req, res) => {
     console.error('Sales order creation failed:', error instanceof Error ? error.message : error); res.status(500).json({ error: 'Unable to create sales order.' });
   }
 });
+
+
+app.put('/api/sales/orders/:id', requireSupabaseUser, async (req, res) => {
+  const id = Number(req.params.id);
+  const body = req.body as Record<string, unknown>;
+
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    res.status(400).json({ error: 'Invalid sales order ID.' });
+    return;
+  }
+
+  const customer =
+    body.customer && typeof body.customer === 'object'
+      ? customerSnapshot(body.customer as Record<string, unknown>)
+      : null;
+
+  const customerId = validCustomerId(customer?.id);
+  const totals = buildSalesLines(body.items);
+
+  if (!customer?.businessName || !customerId || !totals) {
+    res.status(400).json({
+      error: 'Provide a saved customer and valid order items.',
+    });
+    return;
+  }
+
+  try {
+    const existing = await pool.query(
+      `SELECT id, status
+       FROM public.sales_orders
+       WHERE id = $1`,
+      [id],
+    );
+
+    if (!existing.rowCount) {
+      res.status(404).json({ error: 'Sales order not found.' });
+      return;
+    }
+
+    if (existing.rows[0].status !== 'Draft') {
+      res.status(409).json({
+        error: 'Only Draft sales orders can be edited.',
+      });
+      return;
+    }
+
+    const customerExists = await pool.query(
+      'SELECT 1 FROM public.customers WHERE id = $1',
+      [customerId],
+    );
+
+    if (!customerExists.rowCount) {
+      res.status(400).json({
+        error: 'Selected customer was not found.',
+      });
+      return;
+    }
+
+    const result = await pool.query(
+      `UPDATE public.sales_orders
+       SET customer_id = $2,
+           customer_snapshot = $3::jsonb,
+           items = $4::jsonb,
+           subtotal = $5,
+           discount_total = $6,
+           taxable_value = $7,
+           tax_total = $8,
+           grand_total = $9,
+           order_date = COALESCE(NULLIF($10,'')::date, order_date),
+           notes = NULLIF($11,'')
+       WHERE id = $1 AND status = 'Draft'
+       RETURNING id,
+                 order_number AS "orderNumber",
+                 status,
+                 grand_total AS "grandTotal",
+                 created_at AS "createdAt"`,
+      [
+        id,
+        customerId,
+        JSON.stringify(customer),
+        JSON.stringify(totals.lines),
+        totals.subtotal,
+        totals.discountTotal,
+        totals.taxableValue,
+        totals.taxTotal,
+        totals.grandTotal,
+        typeof body.orderDate === 'string' ? body.orderDate : '',
+        typeof body.notes === 'string'
+          ? body.notes.slice(0, 2000)
+          : '',
+      ],
+    );
+
+    if (!result.rowCount) {
+      res.status(409).json({
+        error: 'This order is no longer a Draft and cannot be edited.',
+      });
+      return;
+    }
+
+    res.json({ success: true, order: result.rows[0] });
+  } catch (error) {
+    console.error(
+      'Sales order update failed:',
+      error instanceof Error ? error.message : error,
+    );
+
+    res.status(500).json({
+      error: 'Unable to update sales order.',
+    });
+  }
+});
+
 
 app.get('/api/sales/invoices', requireSupabaseUser, async (req, res) => {
   const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';

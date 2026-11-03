@@ -1,6 +1,7 @@
 
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 import Sidebar from "../components/Sidebar";
 
@@ -389,7 +390,7 @@ function ProductPicker({ line, onChange }) {
 
 
 
-function OrderDetailsModal({ order, onClose }) {
+function OrderDetailsModal({ order, onClose, onEdit }) {
 
   if (!order) return null;
 
@@ -485,6 +486,9 @@ function OrderDetailsModal({ order, onClose }) {
 
 
           <div className="sales-print-actions">
+            {order.status === "Draft" && (
+              <button type="button" className="sales-secondary" onClick={() => onEdit?.(order)}>Edit Draft</button>
+            )}
             <button type="button" className="sales-secondary" onClick={() => window.print()}>Print Order</button>
             <button type="button" className="sales-primary" onClick={() => window.print()}>Download PDF</button>
           </div>
@@ -898,8 +902,10 @@ function OrderDetailsModal({ order, onClose }) {
 
 
 export default function Sales({ activePage = "Sales" }) {
+  const location = useLocation();
 
-  const [tab, setTab] = useState("Orders");
+  const [tab, setTab] = useState(location.state?.salesTab || "Orders");
+  useEffect(() => { if (location.state?.salesTab) setTab(location.state.salesTab); }, [location.state?.salesTab]);
 
   const [summary, setSummary] = useState(null);
 
@@ -924,6 +930,8 @@ export default function Sales({ activePage = "Sales" }) {
   const [saving, setSaving] = useState(false);
 
   const [viewOrder, setViewOrder] = useState(null);
+
+  const [editingOrder, setEditingOrder] = useState(null);
 
 
 
@@ -1099,6 +1107,7 @@ export default function Sales({ activePage = "Sales" }) {
 
   const openCreate = () => {
 
+    setEditingOrder(null);
     setError("");
 
     setNotice("");
@@ -1135,6 +1144,45 @@ export default function Sales({ activePage = "Sales" }) {
 
     setModal(true);
 
+  };
+
+
+
+  const openEditOrder = (order) => {
+    if (order.status !== "Draft") {
+      setError("Only Draft sales orders can be edited.");
+      return;
+    }
+
+    setError("");
+    setNotice("");
+    const legacyItems = Array.isArray(order.items) ? order.items : [];
+    const items = legacyItems.length
+      ? legacyItems.map((item) => ({
+          ...emptyLine(),
+          ...item,
+          quantity: item.quantity ?? 1,
+          unitPrice: item.unitPrice ?? item.dealerPrice ?? 0,
+          discountPercent: item.discountPercent ?? 0,
+          taxPercent: item.taxPercent ?? 18,
+        }))
+      : [emptyLine()];
+
+    setEditingOrder(order);
+    setForm({
+      documentNumber: order.orderNumber || "",
+      customerId: String(order.customer?.id || ""),
+      invoiceId: "",
+      date: String(order.orderDate || order.createdAt || today()).slice(0, 10),
+      dueDate: "",
+      amount: "",
+      paymentMethod: "UPI",
+      referenceNumber: "",
+      notes: order.notes || "",
+      items,
+    });
+    setViewOrder(null);
+    setModal(true);
   };
 
 
@@ -1181,19 +1229,19 @@ export default function Sales({ activePage = "Sales" }) {
 
         if (tab === "Orders") {
 
-          payload.orderNumber = form.documentNumber;
-
           payload.orderDate = form.date;
 
-
-
-          result = await api("/sales/orders", {
-
-            method: "POST",
-
-            body: JSON.stringify(payload),
-
-          });
+          result = await api(
+            editingOrder ? `/sales/orders/${editingOrder.id}` : "/sales/orders",
+            {
+              method: editingOrder ? "PUT" : "POST",
+              body: JSON.stringify(
+                editingOrder
+                  ? payload
+                  : { ...payload, orderNumber: form.documentNumber }
+              ),
+            }
+          );
 
         } else {
 
@@ -1247,8 +1295,13 @@ export default function Sales({ activePage = "Sales" }) {
 
 
 
-      setNotice(`${tab.slice(0, -1)} saved successfully.`);
+      setNotice(
+        editingOrder
+          ? "Sales order updated successfully."
+          : `${tab.slice(0, -1)} saved successfully.`
+      );
 
+      setEditingOrder(null);
       setModal(false);
 
       await load();
@@ -1801,7 +1854,7 @@ export default function Sales({ activePage = "Sales" }) {
 
                 <h2 id="sales-modal-title">
 
-                  New{" "}
+                  {editingOrder ? "Edit Draft Sales Order" : <>New{" "}
 
                   {tab === "Orders"
 
@@ -1811,7 +1864,7 @@ export default function Sales({ activePage = "Sales" }) {
 
                       ? "sales invoice"
 
-                      : "customer payment"}
+                      : "customer payment"}</>}
 
                 </h2>
 
@@ -1866,6 +1919,8 @@ export default function Sales({ activePage = "Sales" }) {
                   required
 
                   maxLength="80"
+
+                  disabled={Boolean(editingOrder)}
 
                   value={form.documentNumber}
 
@@ -2555,7 +2610,7 @@ export default function Sales({ activePage = "Sales" }) {
 
                 >
 
-                  {saving ? "Saving…" : "Save record"}
+                  {saving ? "Saving…" : editingOrder ? "Update Draft" : "Save record"}
 
                 </button>
 
@@ -2578,6 +2633,8 @@ export default function Sales({ activePage = "Sales" }) {
           order={viewOrder}
 
           onClose={() => setViewOrder(null)}
+
+          onEdit={openEditOrder}
 
         />
 
