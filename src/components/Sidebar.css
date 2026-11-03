@@ -1,0 +1,60 @@
+/* Sidebar-only styling. Does not modify header, page content, cards, or tables. */
+.bb-sidebar {
+  background: linear-gradient(180deg, #0b172a 0%, #0d1b30 100%);
+  border-right: 1px solid #1d2c43;
+  padding: 22px 14px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: #34465f transparent;
+}
+.bb-brand { padding-bottom: 24px; }
+.bb-nav { gap: 5px; }
+.bb-dashboard, .bb-group-head {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  min-height: 43px; padding: 10px 12px; border: 0; border-radius: 10px;
+  background: transparent; color: #cbd7e8; text-align: left;
+  font-size: 13px; font-weight: 650;
+  transition: background 150ms ease, color 150ms ease;
+}
+.bb-dashboard:hover, .bb-group-head:hover { background: #152943; color: #fff; }
+.bb-dashboard.bb-active { background: #1b3558; color: #fff; }
+.bb-nav-icon { display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; flex: 0 0 22px; font-size: 18px; }
+.bb-group { padding-top: 5px; border-top: 1px solid rgba(148,163,184,.14); }
+.bb-group-head { min-height: 42px; }
+.bb-group-current .bb-group-title { color: #fff; }
+.bb-group-title { flex: 1; }
+.bb-chevron { color: #8297b5; font-size: 16px; transition: transform 150ms ease; }
+.bb-chevron-open { transform: rotate(180deg); }
+.bb-subnav { display: grid; gap: 3px; padding: 4px 0 8px 12px; }
+.bb-subitem { display: flex; align-items: center; gap: 9px; width: 100%;
+  min-height: 36px; padding: 8px 9px; border: 0; border-radius: 8px;
+  background: transparent; color: #b9c8dc; text-align: left; font-size: 12px;
+  transition: background 150ms ease, color 150ms ease; }
+.bb-subitem:not(:disabled):hover { background: #162b47; color: #fff; }
+.bb-subitem.bb-selected { background: #2154a5; color: #fff;
+  box-shadow: inset 3px 0 #22d3ee; }
+.bb-subitem:disabled { opacity: .62; cursor: not-allowed; }
+.bb-sub-icon { width: 15px; flex: 0 0 15px; text-align: center; color: #7892b4; font-size: 12px; }
+.bb-selected .bb-sub-icon { color: #fff; }
+.bb-sub-label { flex: 1; min-width: 0; }
+.bb-soon { padding: 2px 6px; border: 1px solid #34465f; border-radius: 5px;
+  color: #8fa3bf; font-size: 9px; font-weight: 700; letter-spacing: .02em; }
+.bb-database { border-color: #34465e; background: #14243a; }
+@media (max-width: 760px) {
+  .bb-sidebar { flex-basis: 235px; width: 235px; padding-left: 10px; padding-right: 10px; }
+  .bb-subitem { font-size: 11px; }
+}
+
+/* Crisp, consistent vector icons (no emoji/font dependency) */
+.bb-svg-icon { display:block; flex:0 0 auto; width:18px; height:18px; }
+.bb-nav-icon { color:#a9bdd8; }
+.bb-sub-icon { display:inline-flex; align-items:center; justify-content:center; }
+.bb-selected .bb-sub-icon { color:#fff; }
+.bb-database .database-icon { display:flex; align-items:center; justify-content:center; color:#60a5fa; }
+
+/* Ensure each submenu's dedicated SVG icon is visible and distinct */
+.bb-sub-icon { width:22px; min-width:22px; height:20px; display:inline-flex; align-items:center; justify-content:center; color:#7f9dbc; }
+.bb-sub-icon .bb-svg-icon { width:15px; height:15px; stroke-width:1.8; }
+.bb-selected .bb-sub-icon { color:#ffffff; }
+.bb-subitem:hover:not(:disabled) .bb-sub-icon { color:#c7e4ff; }
+.bb-pending .bb-sub-icon { color:#7890ad; opacity:1; }
