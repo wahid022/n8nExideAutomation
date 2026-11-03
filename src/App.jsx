@@ -21,10 +21,8 @@ export default function App() {
       <AuthProvider>
         <QuotationProvider>
           <Routes>
-            {/* Authentication */}
             <Route path="/login" element={<Login />} />
 
-            {/* Protected application routes */}
             <Route element={<ProtectedRoute />}>
               {/* Main Dashboard */}
               <Route
@@ -57,7 +55,7 @@ export default function App() {
 
               {/* Quotation */}
               <Route
-                path="/sales/quotation"
+                path="/quotation"
                 element={
                   <Quotation
                     activePage="Quotation"
@@ -66,26 +64,31 @@ export default function App() {
                 }
               />
 
-              {/* Credit Notes */}
+              {/* Customers */}
+              <Route
+                path="/customers"
+                element={<Customers activePage="Customers" />}
+              />
+
+              {/* Credit Notes - Separate Page */}
               <Route
                 path="/sales-operations/credit-notes"
                 element={<SalesOperations activePage="Credit Notes" />}
               />
 
-              {/* Delivery Challan */}
+              {/* Delivery Challans - Separate Page */}
               <Route
                 path="/sales-operations/delivery-challans"
-                element={<SalesOperations activePage="Delivery Challan" />}
+                element={<SalesOperations activePage="Delivery Challans" />}
               />
 
-              {/* Customers */}
+              {/* Existing Sales Operations */}
               <Route
-                path="/sales/customers"
-                element={<Customers activePage="Customers" />}
+                path="/sales-operations"
+                element={<SalesOperations />}
               />
             </Route>
 
-            {/* Default redirects */}
             <Route
               path="/"
               element={<Navigate to="/dashboard" replace />}
