@@ -197,7 +197,11 @@ export default function SalesOperations({ activePage }) {
           challanNumber: form.number,
           customer,
           challanDate: form.date,
-          items: form.items,
+          // Delivery Challans contain only product description and quantity.
+          items: form.items.map(({ productName, quantity }) => ({
+            productName,
+            quantity: Number(quantity),
+          })),
           notes: form.notes,
           status: "Draft",
         };
@@ -790,49 +794,50 @@ export default function SalesOperations({ activePage }) {
                           />
                         </label>
 
-                        <label>
-                          Unit price
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            required
-                            value={x.unitPrice}
-                            onChange={(e) =>
-                              changeItem(i, "unitPrice", e.target.value)
-                            }
-                          />
-                        </label>
+                        {/* Pricing/tax fields are only for recurring invoices, not Delivery Challans. */}
+                        {tab !== "Delivery Challans" && (
+                          <>
+                            <label>
+                              Unit price
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                required
+                                value={x.unitPrice}
+                                onChange={(e) =>
+                                  changeItem(i, "unitPrice", e.target.value)
+                                }
+                              />
+                            </label>
 
-                        <label>
-                          Discount %
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={x.discountPercent}
-                            onChange={(e) =>
-                              changeItem(
-                                i,
-                                "discountPercent",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </label>
+                            <label>
+                              Discount %
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={x.discountPercent}
+                                onChange={(e) =>
+                                  changeItem(i, "discountPercent", e.target.value)
+                                }
+                              />
+                            </label>
 
-                        <label>
-                          GST %
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={x.taxPercent}
-                            onChange={(e) =>
-                              changeItem(i, "taxPercent", e.target.value)
-                            }
-                          />
-                        </label>
+                            <label>
+                              GST %
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={x.taxPercent}
+                                onChange={(e) =>
+                                  changeItem(i, "taxPercent", e.target.value)
+                                }
+                              />
+                            </label>
+                          </>
+                        )}
 
                         {form.items.length > 1 && (
                           <button
