@@ -37,3 +37,6 @@ backend/*.backup
 /Unified_Product_Price_Master_Refined_Final.xlsx
 /deep-audit.cjs
 /inspect-workbook.cjs
+
+# Claude Code local config
+.claude/

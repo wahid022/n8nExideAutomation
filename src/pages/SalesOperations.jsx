@@ -49,6 +49,8 @@ async function api(path, options = {}) {
 const blankItem = () => ({
   productName: "",
   productCode: "",
+  productId: "",
+  productSearch: "",
   quantity: 1,
   unitPrice: 0,
   discountPercent: 0,
@@ -162,7 +164,14 @@ export default function SalesOperations({ activePage }) {
     });
 
     setModal(true);
+
   };
+
+  const searchProducts = useCallback(
+    (query) =>
+      api(`/products?search=${encodeURIComponent(query)}&pageSize=20`),
+    []
+  );
 
   const changeItem = (i, k, v) =>
     setForm((f) => ({
@@ -198,8 +207,10 @@ export default function SalesOperations({ activePage }) {
           customer,
           challanDate: form.date,
           // Delivery Challans contain only product description and quantity.
-          items: form.items.map(({ productName, quantity }) => ({
-            productName,
+          items: form.items.map(({ productName, productSearch, productCode, productId, quantity }) => ({
+            productName: productName || productSearch || "",
+            productCode: productCode || null,
+            productId: productId || null,
             quantity: Number(quantity),
           })),
           notes: form.notes,
@@ -767,17 +778,26 @@ export default function SalesOperations({ activePage }) {
                       <div className="sales-line" key={i}>
                         <label>
                           Description
-                          <input
-                            required
-                            value={x.productName}
-                            onChange={(e) =>
-                              changeItem(
-                                i,
-                                "productName",
-                                e.target.value
-                              )
-                            }
-                          />
+                          {tab === "Delivery Challans" ? (
+                            <DeliveryProductSearch
+                              line={x}
+                              onChange={(updates) =>
+                                setForm((current) => ({
+                                  ...current,
+                                  items: current.items.map((item, index) =>
+                                    index === i ? { ...item, ...updates } : item
+                                  ),
+                                }))
+                              }
+                              searchProducts={searchProducts}
+                            />
+                          ) : (
+                            <input
+                              required
+                              value={x.productName}
+                              onChange={(e) => changeItem(i, "productName", e.target.value)}
+                            />
+                          )}
                         </label>
 
                         <label>
@@ -887,6 +907,122 @@ export default function SalesOperations({ activePage }) {
               </footer>
             </form>
           </section>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DeliveryProductSearch({ line, onChange, searchProducts }) {
+  const [query, setQuery] = useState(line.productSearch || line.productName || "");
+  const [results, setResults] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || query.trim().length < 2 || line.productId) {
+      setResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const response = await searchProducts(query.trim());
+        setResults(response.data || []);
+      } catch (error) {
+        console.error("Delivery Challan product search failed:", error);
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, open, line.productId, searchProducts]);
+
+  const selectProduct = (product) => {
+    const name = [product.brand, product.modelSku, product.specsCapacity]
+      .filter(Boolean)
+      .join(" ");
+    const productName = name || product.productCode || "";
+    const productCode = product.productCode || "";
+    onChange({
+      productId: product.id,
+      productName,
+      productCode,
+      productSearch: `${productName}${productCode ? ` — ${productCode}` : ""}`,
+    });
+    setQuery(`${productName}${productCode ? ` — ${productCode}` : ""}`);
+    setOpen(false);
+  };
+
+  return (
+    <div className="dc-product-search" style={{ position: "relative" }}>
+      <input
+        required
+        value={query}
+        placeholder="Search product, SKU or code..."
+        autoComplete="off"
+        onFocus={() => setOpen(true)}
+        onChange={(event) => {
+          const value = event.target.value;
+          setQuery(value);
+          setOpen(true);
+          onChange({
+            productSearch: value,
+            productId: null,
+            productName: "",
+            productCode: "",
+          });
+        }}
+      />
+      {open && query.trim().length >= 2 && !line.productId && (
+        <div
+          className="dc-product-results"
+          style={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            right: 0,
+            zIndex: 30,
+            maxHeight: 220,
+            overflowY: "auto",
+            background: "#fff",
+            border: "1px solid #d8e1ef",
+            borderRadius: 6,
+            boxShadow: "0 8px 20px rgba(20,40,80,.14)",
+          }}
+        >
+          {loading && <div style={{ padding: "10px 12px", color: "#64748b" }}>Searching...</div>}
+          {!loading && results.length === 0 && (
+            <div style={{ padding: "10px 12px", color: "#64748b" }}>No products found.</div>
+          )}
+          {!loading && results.map((product) => {
+            const name = [product.brand, product.modelSku, product.specsCapacity]
+              .filter(Boolean)
+              .join(" ") || product.productCode || "Product";
+            const code = product.productCode || "";
+            return (
+              <button
+                type="button"
+                key={product.id}
+                onClick={() => selectProduct(product)}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "9px 12px",
+                  border: 0,
+                  borderRadius: 0,
+                  background: "white",
+                  color: "#172b4d",
+                  cursor: "pointer",
+                }}
+              >
+                {name}{code ? ` — ${code}` : ""}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

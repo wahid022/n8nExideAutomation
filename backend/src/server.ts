@@ -884,7 +884,7 @@ function buildSalesLines(raw: unknown) {
   for (const item of raw as SalesLineInput[]) {
     const name = typeof item.productName === 'string' ? item.productName.trim() : '';
     const quantity = Number(item.quantity);
-    const unitPrice = Number(item.unitPrice);
+    const unitPrice = Number(item.unitPrice ?? 0);
     const discountPercent = Number(item.discountPercent ?? 0);
     const taxPercent = Number(item.taxPercent ?? 0);
     if (!name || name.length > 250 || !Number.isFinite(quantity) || quantity <= 0 || quantity > 1_000_000 ||
