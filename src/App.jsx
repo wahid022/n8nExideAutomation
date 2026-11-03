@@ -66,7 +66,7 @@ export default function App() {
 
               {/* Customers */}
               <Route
-                path="/customers"
+                path="sales/customers"
                 element={<Customers activePage="Customers" />}
               />
 
