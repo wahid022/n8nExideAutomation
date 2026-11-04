@@ -1,152 +1,64 @@
-
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-
-import Dashboard from "./pages/Dashboard";
-import SalesDashboard from "./pages/SalesDashboard";
-import Quotation from "./pages/Quotation";
-import Customers from "./pages/Customers";
-import Sales from "./pages/Sales";
-import SalesOperations from "./pages/SalesOperations";
-import PaymentEntry from "./pages/PaymentEntry";
-import Purchase from "./pages/Purchase";
-import PurchaseDashboard from "./pages/PurchaseDashboard";
-import PurchaseOperations from "./pages/PurchaseOperations";
-import Vendors from "./pages/Vendors";
-import Reports from "./pages/Reports";
-import Login from "./pages/Login";
-import ProtectedRoute from "./components/ProtectedRoute";
-
 import { AuthProvider } from "./context/AuthContext";
 import { QuotationProvider } from "./context/QuotationContext";
-
+import ProtectedRoute from "./components/ProtectedRoute";
 import "./App.css";
+
+const Dashboard         = lazy(() => import("./pages/Dashboard"));
+const SalesDashboard    = lazy(() => import("./pages/SalesDashboard"));
+const Quotation         = lazy(() => import("./pages/Quotation"));
+const Customers         = lazy(() => import("./pages/Customers"));
+const Sales             = lazy(() => import("./pages/Sales"));
+const SalesOperations   = lazy(() => import("./pages/SalesOperations"));
+const PaymentEntry      = lazy(() => import("./pages/PaymentEntry"));
+const Purchase          = lazy(() => import("./pages/Purchase"));
+const PurchaseDashboard = lazy(() => import("./pages/PurchaseDashboard"));
+const PurchaseOperations= lazy(() => import("./pages/PurchaseOperations"));
+const Vendors           = lazy(() => import("./pages/Vendors"));
+const Reports           = lazy(() => import("./pages/Reports"));
+const Login             = lazy(() => import("./pages/Login"));
 
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <QuotationProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
+          <Suspense fallback={<div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", color: "#64748b", fontSize: 14 }}>Loading…</div>}>
+            <Routes>
+              <Route path="/login" element={<Login />} />
 
-            <Route element={<ProtectedRoute />}>
-              {/* Main Dashboard */}
-              <Route
-                path="/dashboard"
-                element={
-                  <Dashboard
-                    activePage="Dashboard"
-                    onNavigate={() => {}}
-                  />
-                }
-              />
+              <Route element={<ProtectedRoute />}>
+                <Route path="/dashboard" element={<Dashboard activePage="Dashboard" onNavigate={() => {}} />} />
 
-              {/* Sales Dashboard */}
-              <Route
-                path="/sales"
-                element={<SalesDashboard activePage="Sales Dashboard" />}
-              />
+                <Route path="/sales"           element={<SalesDashboard activePage="Sales Dashboard" />} />
+                <Route path="/sales/invoices"  element={<Sales activePage="Sales Invoice" />} />
+                <Route path="/sales/orders"    element={<Sales activePage="Sales Order" />} />
+                <Route path="sales/quotation"  element={<Quotation activePage="Quotation" onNavigate={() => {}} />} />
+                <Route path="sales/customers"  element={<Customers activePage="Customers" />} />
 
-              {/* Sales Invoice */}
-              <Route
-                path="/sales/invoices"
-                element={<Sales activePage="Sales Invoice" />}
-              />
+                <Route path="/sales-operations/credit-notes"     element={<SalesOperations activePage="Credit Notes" />} />
+                <Route path="/sales-operations/delivery-challans" element={<SalesOperations activePage="Delivery Challans" />} />
+                <Route path="/sales-operations"                   element={<SalesOperations />} />
 
-              {/* Sales Order */}
-              <Route
-                path="/sales/orders"
-                element={<Sales activePage="Sales Order" />}
-              />
+                <Route path="/accounting/payment-entry" element={<PaymentEntry activePage="Payment Entry" />} />
 
-              {/* Quotation */}
-              <Route
-                path="sales/quotation"
-                element={
-                  <Quotation
-                    activePage="Quotation"
-                    onNavigate={() => {}}
-                  />
-                }
-              />
+                <Route path="/purchase"           element={<PurchaseDashboard activePage="Purchase Dashboard" />} />
+                <Route path="/purchase/invoices"  element={<Purchase activePage="Purchase Invoice" />} />
+                <Route path="/purchase/orders"    element={<Purchase activePage="Purchase Order" />} />
+                <Route path="/purchase/debit-notes" element={<PurchaseOperations activePage="Debit Notes" />} />
+                <Route path="/purchase/vendors"   element={<Vendors activePage="Vendor List" />} />
 
-              {/* Customers */}
-              <Route
-                path="sales/customers"
-                element={<Customers activePage="Customers" />}
-              />
+                <Route path="/reports/profit-loss"   element={<Reports activePage="Profit & Loss" />} />
+                <Route path="/reports/balance-sheet" element={<Reports activePage="Balance Sheet" />} />
+                <Route path="/reports/cash-flow"     element={<Reports activePage="Cash Flow" />} />
+                <Route path="/reports/banking"       element={<Reports activePage="Banking" />} />
+              </Route>
 
-              {/* Credit Notes - Separate Page */}
-              <Route
-                path="/sales-operations/credit-notes"
-                element={<SalesOperations activePage="Credit Notes" />}
-              />
-
-              {/* Delivery Challans - Separate Page */}
-              <Route
-                path="/sales-operations/delivery-challans"
-                element={<SalesOperations activePage="Delivery Challans" />}
-              />
-
-              {/* Existing Sales Operations */}
-              <Route
-                path="/sales-operations"
-                element={<SalesOperations />}
-              />
-
-              {/* Accounting - Payment Entry */}
-              <Route
-                path="/accounting/payment-entry"
-                element={<PaymentEntry activePage="Payment Entry" />}
-              />
-
-              {/* Purchase Dashboard */}
-              <Route
-                path="/purchase"
-                element={<PurchaseDashboard activePage="Purchase Dashboard" />}
-              />
-
-              {/* Purchase Invoice */}
-              <Route
-                path="/purchase/invoices"
-                element={<Purchase activePage="Purchase Invoice" />}
-              />
-
-              {/* Purchase Order */}
-              <Route
-                path="/purchase/orders"
-                element={<Purchase activePage="Purchase Order" />}
-              />
-
-              {/* Debit Notes */}
-              <Route
-                path="/purchase/debit-notes"
-                element={<PurchaseOperations activePage="Debit Notes" />}
-              />
-
-              {/* Vendor List */}
-              <Route
-                path="/purchase/vendors"
-                element={<Vendors activePage="Vendor List" />}
-              />
-
-              {/* Reports */}
-              <Route path="/reports/profit-loss"   element={<Reports activePage="Profit & Loss" />} />
-              <Route path="/reports/balance-sheet" element={<Reports activePage="Balance Sheet" />} />
-              <Route path="/reports/cash-flow"     element={<Reports activePage="Cash Flow" />} />
-              <Route path="/reports/banking"       element={<Reports activePage="Banking" />} />
-            </Route>
-
-            <Route
-              path="/"
-              element={<Navigate to="/dashboard" replace />}
-            />
-
-            <Route
-              path="*"
-              element={<Navigate to="/dashboard" replace />}
-            />
-          </Routes>
+              <Route path="/"  element={<Navigate to="/dashboard" replace />} />
+              <Route path="*"  element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </Suspense>
         </QuotationProvider>
       </AuthProvider>
     </BrowserRouter>
