@@ -84,6 +84,8 @@ export default function SalesOperations({ activePage }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [viewCreditNote, setViewCreditNote] = useState(null);
+  const [autoPrintCreditNote, setAutoPrintCreditNote] = useState(false);
 
   // Keep the standalone page selected even when navigating back/forward.
   useEffect(() => {
@@ -165,6 +167,27 @@ export default function SalesOperations({ activePage }) {
       notes: "",
     });
 
+    setModal(true);
+  };
+
+  const openEditCreditNote = (row) => {
+    setEditingId(row.id);
+    setError("");
+    setNotice("");
+    setForm({
+      number: row.creditNoteNumber,
+      customerId: String(row.customerId),
+      date: String(row.creditDate || "").slice(0, 10) || today(),
+      amount: row.amount || "",
+      reason: row.reason || "",
+      invoiceId: row.invoiceId ? String(row.invoiceId) : "",
+      frequency: "Monthly",
+      nextRunDate: today(),
+      endDate: "",
+      dueDays: 30,
+      items: [blankItem()],
+      notes: row.notes || "",
+    });
     setModal(true);
   };
 
@@ -252,7 +275,7 @@ export default function SalesOperations({ activePage }) {
           status: "Draft",
         };
       } else if (tab === "Credit Notes") {
-        path = "/sales/credit-notes";
+        path = editingId ? `/sales/credit-notes/${editingId}` : "/sales/credit-notes";
 
         payload = {
           creditNoteNumber: form.number,
@@ -575,6 +598,16 @@ export default function SalesOperations({ activePage }) {
                                 )}
 
                               {tab === "Credit Notes" &&
+                                !["Void"].includes(r.status) && (
+                                  <button
+                                    className="sales-secondary"
+                                    onClick={() => openEditCreditNote(r)}
+                                  >
+                                    Edit
+                                  </button>
+                                )}
+
+                              {tab === "Credit Notes" &&
                                 r.status === "Draft" && (
                                   <button
                                     className="sales-secondary"
@@ -599,6 +632,24 @@ export default function SalesOperations({ activePage }) {
                                     Issue
                                   </button>
                                 )}
+
+                              {tab === "Credit Notes" && (
+                                <button
+                                  className="sales-secondary"
+                                  onClick={() => { setAutoPrintCreditNote(true); setViewCreditNote(r); }}
+                                >
+                                  Print
+                                </button>
+                              )}
+
+                              {tab === "Credit Notes" && (
+                                <button
+                                  className="sales-view-button"
+                                  onClick={() => { setAutoPrintCreditNote(false); setViewCreditNote(r); }}
+                                >
+                                  Preview
+                                </button>
+                              )}
 
                               {tab === "Recurring Invoices" && (
                                 <button
@@ -991,6 +1042,147 @@ export default function SalesOperations({ activePage }) {
           </section>
         </div>
       )}
+
+      {viewCreditNote && (
+        <CreditNoteModal
+          record={viewCreditNote}
+          autoPrint={autoPrintCreditNote}
+          onClose={() => setViewCreditNote(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function CreditNoteModal({ record, autoPrint, onClose }) {
+  useEffect(() => {
+    if (autoPrint) {
+      const t = setTimeout(() => window.print(), 400);
+      return () => clearTimeout(t);
+    }
+  }, [autoPrint]);
+
+  const money = (n) =>
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(n || 0));
+
+  const fmtDate = (v) =>
+    v ? new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }) : "—";
+
+  const statusColors = {
+    Draft:   { bg: "#fef9c3", color: "#854d0e" },
+    Issued:  { bg: "#dbeafe", color: "#1e40af" },
+    Applied: { bg: "#dcfce7", color: "#166534" },
+    Void:    { bg: "#fee2e2", color: "#991b1b" },
+  };
+  const badge = statusColors[record.status] || { bg: "#f1f5f9", color: "#475569" };
+
+  return (
+    <div className="sales-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <section className="sales-modal" style={{ maxWidth: 640, width: "100%" }} role="dialog" aria-modal="true" aria-label="Credit Note Preview">
+        <header style={{ borderBottom: "1px solid #e2e8f0", paddingBottom: 14, marginBottom: 0 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 17 }}>Credit Note Preview</h2>
+            <p style={{ margin: "3px 0 0", color: "#64748b", fontSize: 13 }}>{record.creditNoteNumber}</p>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="sales-secondary" onClick={() => window.print()}>Print</button>
+            <button type="button" className="sales-close" onClick={onClose} aria-label="Close">×</button>
+          </div>
+        </header>
+
+        <div className="sales-print-document" style={{ padding: "24px 28px" }}>
+          {/* Company header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 20, color: "#172033", letterSpacing: "-0.3px" }}>Bharat Batteries</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Your Trusted Partner in Power Solutions</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{
+                display: "inline-block",
+                padding: "3px 12px",
+                borderRadius: 999,
+                fontSize: 12,
+                fontWeight: 700,
+                background: badge.bg,
+                color: badge.color,
+                marginBottom: 6,
+              }}>{record.status || "Draft"}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#2563eb" }}>CREDIT NOTE</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{record.creditNoteNumber}</div>
+            </div>
+          </div>
+
+          <hr style={{ border: "none", borderTop: "1.5px solid #e2e8f0", margin: "0 0 20px" }} />
+
+          {/* Meta grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px", marginBottom: 20 }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>Issued To</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "#172033" }}>
+                {record.customer?.businessName || `Customer #${record.customerId}`}
+              </div>
+              {record.customer?.phone && <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{record.customer.phone}</div>}
+              {record.customer?.email && <div style={{ fontSize: 12, color: "#64748b" }}>{record.customer.email}</div>}
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>Credit Date</div>
+              <div style={{ fontWeight: 600, fontSize: 14, color: "#172033" }}>{fmtDate(record.creditDate)}</div>
+              {record.invoiceId && (
+                <>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".06em", marginTop: 10, marginBottom: 4 }}>Against Invoice</div>
+                  <div style={{ fontSize: 13, color: "#64748b" }}>#{record.invoiceId}</div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Credit amount */}
+          <div style={{ background: "#f0fdf4", border: "1.5px solid #bbf7d0", borderRadius: 12, padding: "16px 20px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#15803d", textTransform: "uppercase", letterSpacing: ".06em" }}>Credit Amount</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: "#166534", marginTop: 2 }}>{money(record.amount)}</div>
+            </div>
+            <svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="1" x2="12" y2="23"/>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+          </div>
+
+          {/* Reason */}
+          {record.reason && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Reason for Credit</div>
+              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", fontSize: 13.5, color: "#334155", lineHeight: 1.5 }}>
+                {record.reason}
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          {record.notes && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Notes</div>
+              <div style={{ fontSize: 13, color: "#64748b" }}>{record.notes}</div>
+            </div>
+          )}
+
+          <hr style={{ border: "none", borderTop: "1px solid #e2e8f0", margin: "0 0 16px" }} />
+
+          {/* Footer */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+            <div style={{ fontSize: 11, color: "#94a3b8" }}>
+              Generated by Bharat Batteries Business Portal
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 28 }}>Authorised Signatory</div>
+              <div style={{ borderTop: "1px solid #334155", paddingTop: 4, fontSize: 12, color: "#334155", fontWeight: 600 }}>
+                Bharat Batteries
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

@@ -677,6 +677,11 @@
     display: none !important;
 }
 
+/* Keep print document visible when inside a preview modal */
+.sales-modal .sales-print-document {
+    display: block !important;
+}
+
 /* =========================================================
    PROFESSIONAL PRINT LAYOUT
    ========================================================= */
