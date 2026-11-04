@@ -77,6 +77,15 @@ export default function Quotation({ activePage = "Quotation", onNavigate = () =>
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto-generate a quotation number if the draft doesn't have one yet.
+  useEffect(() => {
+    if (!draft.quote?.number) {
+      setQuote({ number: newNumber(), date: today() });
+    }
+  // Only run once on mount.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Close saved-customer suggestions whenever the user clicks or taps outside the search area.
   useEffect(() => {
     const handleOutsidePointerDown = (event) => {
@@ -272,6 +281,8 @@ export default function Quotation({ activePage = "Quotation", onNavigate = () =>
             <aside className="bb-quote-panel bb-summary-panel"><h2><span className="bb-title-icon">▦</span>Summary (₹)</h2><div className="bb-summary-line"><span>Subtotal</span><b>{money(totals.subtotal)}</b></div><div className="bb-summary-line"><span>Total discount</span><b>−{money(totals.discountTotal)}</b></div><div className="bb-summary-line"><span>Taxable value</span><b>{money(totals.taxableValue)}</b></div>{taxMode === "gst" && <><div className="bb-summary-line"><span>{supplyType === "intra" ? `CGST (${(totals.rows.reduce((s,r)=>s+r.tax,0) ? "½" : "0" )}) + SGST` : "IGST"}</span><b>{money(totals.taxTotal)}</b></div><div className="bb-supply-control"><label>Supply type<select value={supplyType} onChange={(e) => setSupplyType(e.target.value)}><option value="intra">Within state (CGST + SGST)</option><option value="inter">Interstate (IGST)</option></select></label></div></>}<div className="bb-summary-line"><span>Round off <label className="bb-round-toggle"><input type="checkbox" checked={roundOffEnabled} onChange={(e) => setRoundOffEnabled(e.target.checked)}/> Apply</label></span><input className="bb-round-input" type="number" step="0.01" value={roundOff} onChange={(e) => setRoundOff(e.target.value)} disabled={!roundOffEnabled}/></div><div className="bb-grand-total"><strong>Grand total</strong><strong>{money(totals.grandTotal)}</strong></div></aside>
           </div>
 
+          {error && <div className="bb-alert error no-print bb-actions-error" role="alert">{error}</div>}
+          {notice && <div className="bb-alert no-print bb-actions-notice" role="status">{notice}</div>}
           <div className="bb-quotation-actions no-print"><button type="button" className="bb-plain-button" onClick={clearQuotation}>Clear items</button><span/><button type="button" className="bb-outline-button" disabled={busy} onClick={() => saveQuotation("Draft")}>{busy ? "Saving…" : "▣ Save draft"}</button><button type="button" className="bb-primary-button" disabled={busy} onClick={generatePdf}>{busy ? "Saving quotation…" : "▤ Generate quotation PDF"}</button></div>
 
           <article className="bb-print-document"><header><div className="bb-print-brand"><div className="bb-print-mark">BB</div><div><h1>{supplier.businessName || "Bharat Batteries"}</h1><p>{supplier.tagline}</p><p>{supplier.address}</p><p>Phone: {supplier.phone || "—"} · {supplier.email || "—"}</p><p>GSTIN: {supplier.gstin || "—"}</p></div></div><div className="bb-print-label"><h2>ESTIMATE / QUOTATION</h2><p>No: {quote.number}</p><p>Date: {quote.date}</p><p>Valid: {quote.validDays} days</p></div></header><section className="bb-print-customer"><strong>QUOTATION FOR</strong><h3>{customer.company || "Customer"}</h3><p>{customer.name} · {customer.phone}</p><p>{customer.address}</p>{customer.gstin && <p>GSTIN: {customer.gstin}</p>}</section><table><thead><tr><th>#</th><th>Item</th><th>Qty</th><th>Rate</th><th>Discount</th>{taxMode === "gst" && <th>GST</th>}<th>Amount</th></tr></thead><tbody>{totals.rows.map((r,i)=><tr key={r.id}><td>{i+1}</td><td>{valueOf(r.product,"product_name","Model / SKU")}<small>{r.id} · {valueOf(r.product,"brand","Brand")}</small></td><td>{r.qty} {r.unit}</td><td>{money(r.rate)}</td><td>{r.discountPercent}%</td>{taxMode === "gst" && <td>{r.gstRate}%</td>}<td>{money(r.lineTotal)}</td></tr>)}</tbody></table><div className="bb-print-total"><p>Subtotal: {money(totals.subtotal)}</p><p>Discount: {money(totals.discountTotal)}</p><p>Taxable value: {money(totals.taxableValue)}</p>{taxMode === "gst" && <p>GST: {money(totals.taxTotal)}</p>}<h2>Grand total: {money(totals.grandTotal)}</h2></div><section className="bb-print-terms"><strong>Notes / Terms</strong><p>{quote.terms || "Subject to availability."}</p></section><footer>For {supplier.businessName || "Bharat Batteries"}<br/><br/>Authorised Signatory</footer></article>

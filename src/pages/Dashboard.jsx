@@ -5,7 +5,6 @@ import useProductFilters from "../hooks/useProductFilters";
 import useProductSorting from "../hooks/useProductSorting";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import StatCard from "../components/StatCard";
 import PriceLookup from "../components/PriceLookup";
 
 const DEFAULT_BRAND = "All Brands";
@@ -13,25 +12,10 @@ const DEFAULT_CATEGORY = "All Categories";
 const DEFAULT_PAGE_SIZE = 25;
 
 function formatINR(value) {
-  if (
-    value === null ||
-    value === undefined ||
-    String(value).trim() === ""
-  ) {
-    return "—";
-  }
-
+  if (value === null || value === undefined || String(value).trim() === "") return null;
   const amount = Number(value);
-
-  if (!Number.isFinite(amount)) {
-    return "—";
-  }
-
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(amount);
+  if (!Number.isFinite(amount)) return null;
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(amount);
 }
 
 function getField(product, alias, workbookField) {
@@ -39,26 +23,35 @@ function getField(product, alias, workbookField) {
 }
 
 function getProductCode(product) {
-  return String(
-    product?.product_id ?? product?.["Product Code"] ?? ""
-  ).trim();
+  return String(product?.product_id ?? product?.["Product Code"] ?? "").trim();
 }
 
 function hasValue(value) {
-  return (
-    value !== null &&
-    value !== undefined &&
-    String(value).trim() !== ""
-  );
+  return value !== null && value !== undefined && String(value).trim() !== "";
 }
 
 function hasPrice(product, field) {
-  const value =
-    field === "MRP"
-      ? getField(product, "mrp", "MRP")
-      : getField(product, "dealer_price", "Dealer Price");
-
+  const value = field === "MRP" ? getField(product, "mrp", "MRP") : getField(product, "dealer_price", "Dealer Price");
   return hasValue(value) && Number.isFinite(Number(value));
+}
+
+function catBadgeClass(category) {
+  const c = String(category || "").toLowerCase();
+  if (c.includes("automotive")) return "cat-badge--auto";
+  if (c.includes("inverter")) return "cat-badge--inv";
+  if (c.includes("tubular")) return "cat-badge--tub";
+  if (c.includes("smf")) return "cat-badge--smf";
+  return "cat-badge--other";
+}
+
+function Icon({ size = 18, children }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden="true">
+      {children}
+    </svg>
+  );
 }
 
 export default function Dashboard({ activePage = "Dashboard", onNavigate = () => {} }) {
@@ -66,445 +59,301 @@ export default function Dashboard({ activePage = "Dashboard", onNavigate = () =>
   const [search, setSearch] = useState("");
   const [brand, setBrand] = useState(DEFAULT_BRAND);
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
-
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [editingProductId, setEditingProductId] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-
     async function loadProducts() {
       try {
-        setLoading(true);
-        setError("");
-
+        setLoading(true); setError("");
         const data = await getProducts();
-
-        if (!cancelled) {
-          setProducts(Array.isArray(data) ? data : []);
-        }
+        if (!cancelled) setProducts(Array.isArray(data) ? data : []);
       } catch (err) {
-        if (!cancelled) {
-          setError(err?.message || "Failed to load products.");
-        }
+        if (!cancelled) setError(err?.message || "Failed to load products.");
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     }
-
     loadProducts();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const brands = useMemo(
-    () =>
-      [
-        ...new Set(
-          products
-            .map((product) => getField(product, "brand", "Brand"))
-            .filter(hasValue)
-            .map((value) => String(value).trim())
-        ),
-      ].sort((a, b) => a.localeCompare(b)),
+    () => [...new Set(products.map(p => getField(p, "brand", "Brand")).filter(hasValue).map(v => String(v).trim()))].sort((a, b) => a.localeCompare(b)),
     [products]
   );
-
   const categories = useMemo(
-    () =>
-      [
-        ...new Set(
-          products
-            .map((product) => getField(product, "category", "Category"))
-            .filter(hasValue)
-            .map((value) => String(value).trim())
-        ),
-      ].sort((a, b) => a.localeCompare(b)),
+    () => [...new Set(products.map(p => getField(p, "category", "Category")).filter(hasValue).map(v => String(v).trim()))].sort((a, b) => a.localeCompare(b)),
     [products]
   );
 
-  const filteredProducts = useProductFilters({
-    products,
-    search,
-    brand,
-    category,
-  });
-
-  const sortedProducts = useProductSorting({
-    products: filteredProducts,
-    sortBy,
-  });
-
+  const filteredProducts = useProductFilters({ products, search, brand, category });
+  const sortedProducts = useProductSorting({ products: filteredProducts, sortBy });
   const totalProducts = sortedProducts.length;
   const totalPages = Math.max(1, Math.ceil(totalProducts / pageSize));
   const visiblePage = Math.min(currentPage, totalPages);
 
   const paginatedProducts = useMemo(() => {
-    const startIndex = (visiblePage - 1) * pageSize;
-    return sortedProducts.slice(startIndex, startIndex + pageSize);
+    const start = (visiblePage - 1) * pageSize;
+    return sortedProducts.slice(start, start + pageSize);
   }, [sortedProducts, visiblePage, pageSize]);
 
-  const startRecord =
-    totalProducts === 0 ? 0 : (visiblePage - 1) * pageSize + 1;
-
+  const startRecord = totalProducts === 0 ? 0 : (visiblePage - 1) * pageSize + 1;
   const endRecord = Math.min(visiblePage * pageSize, totalProducts);
 
   const pageNumbers = useMemo(() => {
-    const maxVisiblePages = 5;
+    const max = 5;
     let start = Math.max(1, visiblePage - 2);
-    let end = Math.min(totalPages, start + maxVisiblePages - 1);
-
-    start = Math.max(1, end - maxVisiblePages + 1);
-
-    return Array.from(
-      { length: end - start + 1 },
-      (_, index) => start + index
-    );
+    let end = Math.min(totalPages, start + max - 1);
+    start = Math.max(1, end - max + 1);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   }, [visiblePage, totalPages]);
 
   const pricedProductsCount = useMemo(
-    () =>
-      products.filter(
-        (product) =>
-          hasPrice(product, "MRP") ||
-          hasPrice(product, "Dealer Price")
-      ).length,
+    () => products.filter(p => hasPrice(p, "MRP") || hasPrice(p, "Dealer Price")).length,
     [products]
   );
 
-  function goToPage(page) {
-    setCurrentPage(Math.min(Math.max(page, 1), totalPages));
-  }
+  const activeFilters = [
+    brand !== DEFAULT_BRAND && { key: "brand", label: brand, clear: () => { setBrand(DEFAULT_BRAND); setCurrentPage(1); } },
+    category !== DEFAULT_CATEGORY && { key: "cat", label: category, clear: () => { setCategory(DEFAULT_CATEGORY); setCurrentPage(1); } },
+    sortBy !== "default" && { key: "sort", label: "Custom sort", clear: () => { setSortBy("default"); setCurrentPage(1); } },
+    search !== "" && { key: "q", label: `"${search}"`, clear: () => { setSearch(""); setCurrentPage(1); } },
+  ].filter(Boolean);
 
-  function handleSearch(value) {
-    setCurrentPage(1);
-    setSearch(value);
-  }
-
-  function clearFilters() {
-    setSearch("");
-    setBrand(DEFAULT_BRAND);
-    setCategory(DEFAULT_CATEGORY);
-    setSortBy("default");
-    setCurrentPage(1);
-    setEditingProductId("");
-  }
+  function goToPage(page) { setCurrentPage(Math.min(Math.max(page, 1), totalPages)); }
+  function clearFilters() { setSearch(""); setBrand(DEFAULT_BRAND); setCategory(DEFAULT_CATEGORY); setSortBy("default"); setCurrentPage(1); setEditingProductId(""); }
 
   function handlePriceUpdated({ product_code, field, value }) {
-    setProducts((previous) =>
-      previous.map((product) => {
-        if (getProductCode(product) !== String(product_code)) {
-          return product;
-        }
-
-        if (field !== "MRP" && field !== "Dealer Price") {
-          return product;
-        }
-
-        return {
-          ...product,
-          [field]: value,
-          ...(field === "MRP" ? { mrp: value } : {}),
-          ...(field === "Dealer Price"
-            ? { dealer_price: value }
-            : {}),
-        };
-      })
-    );
+    setProducts(prev => prev.map(p => {
+      if (getProductCode(p) !== String(product_code)) return p;
+      if (field !== "MRP" && field !== "Dealer Price") return p;
+      return { ...p, [field]: value, ...(field === "MRP" ? { mrp: value } : {}), ...(field === "Dealer Price" ? { dealer_price: value } : {}) };
+    }));
   }
 
   return (
     <div className="app-layout">
       <Sidebar activePage={activePage} onNavigate={onNavigate} />
-
       <div className="main-area">
         <Topbar />
 
-        <div className="dashboard-search-toolbar no-print">
-          <div className="global-search">
-            <span className="search-icon" aria-hidden="true">⌕</span>
-            <input
-              value={search}
-              onChange={(event) => handleSearch(event.target.value)}
-              placeholder="Search product name, model, code..."
-              aria-label="Search products"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => handleSearch("")}
-                aria-label="Clear search"
-              >
-                ×
-              </button>
-            )}
-          </div>
-        </div>
+        <main className="page-content db-page">
 
-        <main className="page-content">
-          <div className="page-heading">
+          {/* ── Page Header ── */}
+          <div className="db-header">
             <div>
-              <div className="eyebrow">PRODUCT INTELLIGENCE</div>
-              <h1>{activePage}</h1>
-              <p>
-                Explore your Exide and Microtek catalogue and pricing data.
+              <p className="db-eyebrow">PRODUCT CATALOGUE</p>
+              <h1 className="db-title">Product Dashboard</h1>
+              <p className="db-subtitle">
+                {loading
+                  ? "Loading your catalogue…"
+                  : `${products.length.toLocaleString()} products · ${brands.length} brands · ${categories.length} categories`}
               </p>
             </div>
+            <span className={`db-live-pill ${loading ? "db-live-pill--loading" : error ? "db-live-pill--error" : "db-live-pill--ok"}`}>
+              <span className="db-live-dot" />
+              {loading ? "Syncing" : error ? "Offline" : "Live"}
+            </span>
+          </div>
 
-            <div className="data-status">
-              <span
-                className={`status-dot ${
-                  loading || error ? "pending" : ""
-                }`}
-              />
-              {loading
-                ? "Loading product data..."
-                : error
-                  ? "Product API unavailable"
-                  : "Product data connected"}
+          {error && <div className="db-error-banner" role="alert">⚠ {error}</div>}
+
+          {/* ── Stat Cards ── */}
+          <div className="db-stats">
+            <div className="db-stat db-stat--blue">
+              <div className="db-stat-top">
+                <span className="db-stat-label">Total Products</span>
+                <div className="db-stat-icon"><Icon><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></Icon></div>
+              </div>
+              <div className="db-stat-value">{loading ? "—" : products.length.toLocaleString()}</div>
+              <div className="db-stat-note">From Product Master</div>
+            </div>
+
+            <div className="db-stat db-stat--rose">
+              <div className="db-stat-top">
+                <span className="db-stat-label">Brands</span>
+                <div className="db-stat-icon"><Icon><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></Icon></div>
+              </div>
+              <div className="db-stat-value">{loading ? "—" : brands.length}</div>
+              <div className="db-stat-note">{loading ? "Loading…" : brands.slice(0, 3).join(", ")}</div>
+            </div>
+
+            <div className="db-stat db-stat--violet">
+              <div className="db-stat-top">
+                <span className="db-stat-label">Categories</span>
+                <div className="db-stat-icon"><Icon><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></Icon></div>
+              </div>
+              <div className="db-stat-value">{loading ? "—" : categories.length}</div>
+              <div className="db-stat-note">Product types</div>
+            </div>
+
+            <div className="db-stat db-stat--amber">
+              <div className="db-stat-top">
+                <span className="db-stat-label">Priced</span>
+                <div className="db-stat-icon"><Icon><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></Icon></div>
+              </div>
+              <div className="db-stat-value">{loading ? "—" : pricedProductsCount.toLocaleString()}</div>
+              <div className="db-stat-note">
+                {loading ? "Loading…" : `${Math.round(pricedProductsCount / (products.length || 1) * 100)}% with pricing set`}
+              </div>
             </div>
           </div>
 
-          {error && (
-            <div
-              role="alert"
-              style={{ color: "#b91c1c", marginBottom: 16 }}
-            >
-              Could not load products: {error}
-            </div>
-          )}
+          {/* ── Catalogue ── */}
+          <section className="db-catalogue">
 
-          <section className="stats-grid">
-            <StatCard
-              icon="□"
-              label="Total Products"
-              value={loading ? "…" : products.length}
-              note="From Product Master"
-              color="blue"
-            />
-
-            <StatCard
-              icon="◆"
-              label="Brands"
-              value={loading ? "…" : brands.length}
-              note="Distinct brands"
-              color="red"
-            />
-
-            <StatCard
-              icon="▦"
-              label="Categories"
-              value={loading ? "…" : categories.length}
-              note="Distinct product categories"
-              color="purple"
-            />
-
-            <StatCard
-              icon="₹"
-              label="Priced Products"
-              value={loading ? "…" : pricedProductsCount}
-              note="Products with MRP or Dealer Price"
-              color="amber"
-            />
-          </section>
-
-          <section className="catalogue-panel">
-            <div className="panel-heading catalogue-header">
-              <div className="catalogue-heading-text">
-                <h2>Product Catalogue</h2>
-                <p>
-                  Search and explore products from your master workbook.
-                </p>
+            {/* Search + Filters */}
+            <div className="db-toolbar">
+              <div className="db-search">
+                <Icon size={15}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></Icon>
+                <input
+                  value={search}
+                  onChange={e => { setCurrentPage(1); setSearch(e.target.value); }}
+                  placeholder="Search product, model, SKU or code…"
+                  aria-label="Search products"
+                />
+                {search && <button className="db-search-x" onClick={() => { setSearch(""); setCurrentPage(1); }} aria-label="Clear">×</button>}
               </div>
 
-              <span className="record-count">
-                {loading ? "Loading..." : `${totalProducts} products found`}
-              </span>
+              <select className="db-select" value={brand} onChange={e => { setCurrentPage(1); setBrand(e.target.value); setEditingProductId(""); }} aria-label="Brand">
+                <option value={DEFAULT_BRAND}>All Brands</option>
+                {brands.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+
+              <select className="db-select" value={category} onChange={e => { setCurrentPage(1); setCategory(e.target.value); setEditingProductId(""); }} aria-label="Category">
+                <option value={DEFAULT_CATEGORY}>All Categories</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+
+              <select className="db-select" value={sortBy} onChange={e => { setCurrentPage(1); setSortBy(e.target.value); setEditingProductId(""); }} aria-label="Sort">
+                <option value="default">Default order</option>
+                <option value="name-asc">Name A–Z</option>
+                <option value="name-desc">Name Z–A</option>
+                <option value="price-asc">Price: Low → High</option>
+                <option value="price-desc">Price: High → Low</option>
+              </select>
+
+              <div className="db-toolbar-right">
+                {activeFilters.length > 0 && (
+                  <button className="db-clear-btn" onClick={clearFilters}>✕ Clear ({activeFilters.length})</button>
+                )}
+                <span className="db-result-count">
+                  {loading ? "…" : `${totalProducts.toLocaleString()} results`}
+                </span>
+              </div>
             </div>
 
-            <div className="filters-row">
-              <label className="filter-field">
-                <span>Brand</span>
-                <select
-                  value={brand}
-                  onChange={(event) => {
-                    setCurrentPage(1);
-                    setBrand(event.target.value);
-                    setEditingProductId("");
-                  }}
-                >
-                  <option value={DEFAULT_BRAND}>All Brands</option>
-                  {brands.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            {/* Filter chips */}
+            {activeFilters.length > 0 && (
+              <div className="db-chips">
+                {activeFilters.map(f => (
+                  <button key={f.key} className="db-chip" onClick={f.clear}>
+                    {f.label} ×
+                  </button>
+                ))}
+              </div>
+            )}
 
-              <label className="filter-field">
-                <span>Category</span>
-                <select
-                  value={category}
-                  onChange={(event) => {
-                    setCurrentPage(1);
-                    setCategory(event.target.value);
-                    setEditingProductId("");
-                  }}
-                >
-                  <option value={DEFAULT_CATEGORY}>All Categories</option>
-                  {categories.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="filter-field">
-                <span>Sort By</span>
-                <select
-                  value={sortBy}
-                  onChange={(event) => {
-                    setCurrentPage(1);
-                    setSortBy(event.target.value);
-                    setEditingProductId("");
-                  }}
-                >
-                  <option value="default">Default Order</option>
-                  <option value="name-asc">Product Name: A–Z</option>
-                  <option value="name-desc">Product Name: Z–A</option>
-                  <option value="brand-asc">Brand: A–Z</option>
-                  <option value="brand-desc">Brand: Z–A</option>
-                  <option value="price-asc">Price: Low to High</option>
-                  <option value="price-desc">Price: High to Low</option>
-                </select>
-              </label>
-
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={clearFilters}
-              >
-                Clear filters
-              </button>
-            </div>
-
-            <div className="table-wrapper">
-              <table className="product-table">
+            {/* Table */}
+            <div className="db-table-wrap">
+              <table className="db-table">
                 <thead>
                   <tr>
                     <th>Product</th>
                     <th>Brand</th>
-                    <th>Model / Code</th>
                     <th>Category</th>
-                    <th>MRP</th>
-                    <th>Dealer Price</th>
-                    <th>Action</th>
+                    <th className="db-th-right">MRP</th>
+                    <th className="db-th-right">Dealer Price</th>
+                    <th></th>
                   </tr>
                 </thead>
-
                 <tbody>
                   {loading ? (
-                    <tr>
-                      <td colSpan={7}>
-                        <div className="empty-state">
-                          <h3>Loading products...</h3>
-                          <p>Please wait while we fetch your catalogue.</p>
-                        </div>
-                      </td>
-                    </tr>
+                    Array.from({ length: 10 }).map((_, i) => (
+                      <tr key={i} className="db-skel-row">
+                        <td>
+                          <div className="db-skel" style={{ width: "72%", height: 13 }} />
+                          <div className="db-skel" style={{ width: "38%", height: 10, marginTop: 7, borderRadius: 4 }} />
+                        </td>
+                        <td><div className="db-skel" style={{ width: "55%", height: 13 }} /></td>
+                        <td><div className="db-skel" style={{ width: "60%", height: 20, borderRadius: 20 }} /></td>
+                        <td><div className="db-skel" style={{ width: "60%", height: 13, marginLeft: "auto" }} /></td>
+                        <td><div className="db-skel" style={{ width: "70%", height: 15, marginLeft: "auto" }} /></td>
+                        <td><div className="db-skel" style={{ width: 68, height: 28, borderRadius: 6 }} /></td>
+                      </tr>
+                    ))
                   ) : error ? (
-                    <tr>
-                      <td colSpan={7}>
-                        <div className="empty-state">
-                          <h3>Unable to load products</h3>
-                          <p>Check your n8n connection and try again.</p>
-                        </div>
-                      </td>
-                    </tr>
+                    <tr><td colSpan={6}>
+                      <div className="db-empty">
+                        <div className="db-empty-icon">⚠</div>
+                        <strong>Could not load products</strong>
+                        <p>Check your connection and reload the page.</p>
+                      </div>
+                    </td></tr>
                   ) : paginatedProducts.length === 0 ? (
-                    <tr>
-                      <td colSpan={7}>
-                        <div className="empty-state">
-                          <h3>No matching products found</h3>
-                          <p>
-                            Try another search term or clear your filters.
-                          </p>
+                    <tr><td colSpan={6}>
+                      <div className="db-empty">
+                        <div className="db-empty-icon">
+                          <Icon size={30}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></Icon>
                         </div>
-                      </td>
-                    </tr>
+                        <strong>No products found</strong>
+                        <p>Try a different search or clear your filters.</p>
+                        <button className="db-clear-btn" onClick={clearFilters}>Clear all filters</button>
+                      </div>
+                    </td></tr>
                   ) : (
                     paginatedProducts.map((product, index) => {
                       const productId = getProductCode(product);
-                      const productName = getField(
-                        product,
-                        "product_name",
-                        "Model / SKU"
-                      );
-                      const productBrand = getField(
-                        product,
-                        "brand",
-                        "Brand"
-                      );
-                      const productCategory = getField(
-                        product,
-                        "category",
-                        "Category"
-                      );
-                      const modelCode =
-                        product?.["Product Code"] || productId;
-                      const mrpValue = getField(product, "mrp", "MRP");
-                      const dealerPriceValue = getField(
-                        product,
-                        "dealer_price",
-                        "Dealer Price"
-                      );
+                      const productName = getField(product, "product_name", "Model / SKU");
+                      const productBrand = getField(product, "brand", "Brand");
+                      const productCategory = getField(product, "category", "Category");
+                      const mrp = formatINR(getField(product, "mrp", "MRP"));
+                      const dealer = formatINR(getField(product, "dealer_price", "Dealer Price"));
                       const isEditing = editingProductId === productId;
 
                       return (
                         <Fragment key={productId || index}>
-                          <tr>
+                          <tr className={`db-row${isEditing ? " db-row--open" : ""}`}>
                             <td>
-                              <strong>{productName || "—"}</strong>
-                              <div>{productId}</div>
+                              <span className="db-prod-name">{productName || "—"}</span>
+                              {productId && <span className="db-prod-code">{productId}</span>}
                             </td>
-
-                            <td>{productBrand || "—"}</td>
-                            <td>{modelCode || "—"}</td>
-                            <td>{productCategory || "—"}</td>
-                            <td>{formatINR(mrpValue)}</td>
-                            <td>{formatINR(dealerPriceValue)}</td>
-
+                            <td className="db-brand">{productBrand || "—"}</td>
                             <td>
+                              {productCategory
+                                ? <span className={`cat-badge ${catBadgeClass(productCategory)}`}>{productCategory}</span>
+                                : <span className="db-muted">—</span>}
+                            </td>
+                            <td className="db-price-mrp">
+                              {mrp ? <span>{mrp}</span> : <span className="db-muted">—</span>}
+                            </td>
+                            <td className="db-price-dealer">
+                              {dealer
+                                ? <span className="db-dealer-val">{dealer}</span>
+                                : <span className="db-no-price">Not set</span>}
+                            </td>
+                            <td className="db-action-col">
                               <button
                                 type="button"
-                                className="secondary-button"
+                                className={`db-edit-btn${isEditing ? " db-edit-btn--on" : ""}`}
                                 disabled={!productId}
                                 aria-expanded={isEditing}
-                                onClick={() =>
-                                  setEditingProductId(
-                                    isEditing ? "" : productId
-                                  )
-                                }
+                                onClick={() => setEditingProductId(isEditing ? "" : productId)}
                               >
-                                {isEditing ? "Close Editor" : "Edit Price"}
+                                {isEditing ? "✓ Done" : "Edit Price"}
                               </button>
                             </td>
                           </tr>
 
                           {isEditing && (
-                            <tr className="inline-price-editor-row">
-                              <td colSpan={7} style={{ padding: 12 }}>
+                            <tr className="db-editor-row">
+                              <td colSpan={6}>
                                 <PriceLookup
                                   key={productId}
                                   product={product}
@@ -522,26 +371,16 @@ export default function Dashboard({ activePage = "Dashboard", onNavigate = () =>
               </table>
             </div>
 
-            <div className="table-footer catalogue-pagination">
-              <div className="pagination-summary">
-                {loading
-                  ? "Loading products..."
-                  : `Showing ${startRecord}–${endRecord} of ${totalProducts} products`}
-              </div>
+            {/* Pagination */}
+            <div className="db-pager">
+              <span className="db-pager-info">
+                {loading ? "Loading…" : `${startRecord.toLocaleString()}–${endRecord.toLocaleString()} of ${totalProducts.toLocaleString()} products`}
+              </span>
 
-              <div className="pagination-controls">
-                <label className="page-size-control">
-                  <span>Rows per page</span>
-                  <select
-                    aria-label="Rows per page"
-                    value={pageSize}
-                    onChange={(event) => {
-                      setCurrentPage(1);
-                      setPageSize(Number(event.target.value));
-                      setEditingProductId("");
-                    }}
-                    disabled={loading}
-                  >
+              <div className="db-pager-controls">
+                <label className="db-page-size-label">
+                  Show
+                  <select value={pageSize} onChange={e => { setCurrentPage(1); setPageSize(Number(e.target.value)); setEditingProductId(""); }} disabled={loading}>
                     <option value={10}>10</option>
                     <option value={25}>25</option>
                     <option value={50}>50</option>
@@ -549,152 +388,33 @@ export default function Dashboard({ activePage = "Dashboard", onNavigate = () =>
                   </select>
                 </label>
 
-                <button
-                  type="button"
-                  className="pagination-button"
-                  disabled={visiblePage === 1 || loading}
-                  onClick={() => goToPage(visiblePage - 1)}
-                  aria-label="Previous page"
-                >
-                  Previous
-                </button>
+                <div className="db-page-btns">
+                  <button className="db-pgbtn" disabled={visiblePage === 1 || loading} onClick={() => goToPage(visiblePage - 1)}>‹</button>
 
-                {pageNumbers[0] > 1 && (
-                  <>
-                    <button
-                      type="button"
-                      className="pagination-button"
-                      disabled={loading}
-                      onClick={() => goToPage(1)}
-                    >
-                      1
-                    </button>
-                    {pageNumbers[0] > 2 && (
-                      <span className="page-ellipsis">…</span>
-                    )}
-                  </>
-                )}
+                  {pageNumbers[0] > 1 && <>
+                    <button className="db-pgbtn" disabled={loading} onClick={() => goToPage(1)}>1</button>
+                    {pageNumbers[0] > 2 && <span className="db-ellipsis">…</span>}
+                  </>}
 
-                <div className="pagination-pages">
-                  {pageNumbers.map((page) => (
-                    <button
-                      type="button"
-                      key={page}
-                      className={`pagination-button ${
-                        visiblePage === page ? "active" : ""
-                      }`}
-                      aria-current={
-                        visiblePage === page ? "page" : undefined
-                      }
+                  {pageNumbers.map(page => (
+                    <button key={page}
+                      className={`db-pgbtn${visiblePage === page ? " db-pgbtn--cur" : ""}`}
                       disabled={loading}
                       onClick={() => goToPage(page)}
-                    >
+                      aria-current={visiblePage === page ? "page" : undefined}>
                       {page}
                     </button>
                   ))}
+
+                  {pageNumbers[pageNumbers.length - 1] < totalPages && <>
+                    {pageNumbers[pageNumbers.length - 1] < totalPages - 1 && <span className="db-ellipsis">…</span>}
+                    <button className="db-pgbtn" disabled={loading} onClick={() => goToPage(totalPages)}>{totalPages}</button>
+                  </>}
+
+                  <button className="db-pgbtn" disabled={visiblePage === totalPages || loading} onClick={() => goToPage(visiblePage + 1)}>›</button>
                 </div>
-
-                {pageNumbers[pageNumbers.length - 1] < totalPages && (
-                  <>
-                    {pageNumbers[pageNumbers.length - 1] <
-                      totalPages - 1 && (
-                      <span className="page-ellipsis">…</span>
-                    )}
-                    <button
-                      type="button"
-                      className="pagination-button"
-                      disabled={loading}
-                      onClick={() => goToPage(totalPages)}
-                    >
-                      {totalPages}
-                    </button>
-                  </>
-                )}
-
-                <button
-                  type="button"
-                  className="pagination-button"
-                  disabled={visiblePage === totalPages || loading}
-                  onClick={() => goToPage(visiblePage + 1)}
-                  aria-label="Next page"
-                >
-                  Next
-                </button>
               </div>
             </div>
-          </section>
-
-          <section className="bottom-grid">
-            <article className="info-panel">
-              <div className="panel-heading compact">
-                <div>
-                  <h2>Data Sources</h2>
-                  <p>Product catalogue and workbook prices</p>
-                </div>
-              </div>
-
-              {[
-                [
-                  "Product Master",
-                  "Unified product catalogue and prices",
-                  !loading && !error,
-                ],
-                [
-                  "Brand and Category",
-                  "Derived from Product Master",
-                  !loading && !error,
-                ],
-              ].map(([name, description, connected]) => (
-                <div className="source-row" key={name}>
-                  <span className="source-file-icon">▤</span>
-                  <div>
-                    <strong>{name}</strong>
-                    <p>{description}</p>
-                  </div>
-                  <span className="source-pending">
-                    {connected ? "Connected" : "Pending"}
-                  </span>
-                </div>
-              ))}
-            </article>
-
-            <article className="info-panel next-panel">
-              <div className="panel-heading compact">
-                <div>
-                  <h2>Next Steps</h2>
-                  <p>Phase 1 implementation</p>
-                </div>
-              </div>
-
-              <div className="next-step">
-                <span className="step-number">01</span>
-                <div>
-                  <strong>Product catalogue</strong>
-                  <p>Products load from the unified master workbook.</p>
-                </div>
-              </div>
-
-              <div className="next-step">
-                <span className="step-number">02</span>
-                <div>
-                  <strong>Price editing</strong>
-                  <p>
-                    Edit MRP or Dealer Price directly from each product row.
-                  </p>
-                </div>
-              </div>
-
-              <div className="next-step">
-                <span className="step-number">03</span>
-                <div>
-                  <strong>Quotation generation</strong>
-                  <p>
-                    Confirm customer-specific pricing rules before
-                    calculating quotations.
-                  </p>
-                </div>
-              </div>
-            </article>
           </section>
         </main>
       </div>

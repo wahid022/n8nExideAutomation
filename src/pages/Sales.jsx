@@ -1724,6 +1724,56 @@ export default function Sales({ activePage = "Sales" }) {
 
 
 
+          {tab === "Orders" && orders.length > 0 && (
+            <div className="si-stats-strip">
+              <div className="si-stat">
+                <span>Total Orders</span>
+                <strong>{orders.length}</strong>
+              </div>
+              <div className="si-stat">
+                <span>Order Value</span>
+                <strong>{money(orders.reduce((s, r) => s + Number(r.grandTotal || 0), 0))}</strong>
+              </div>
+              <div className="si-stat si-stat--paid">
+                <span>Confirmed</span>
+                <strong>{orders.filter(r => r.status === "Confirmed").length}</strong>
+              </div>
+              <div className="si-stat">
+                <span>Draft</span>
+                <strong>{orders.filter(r => r.status === "Draft").length}</strong>
+              </div>
+              <div className="si-stat si-stat--overdue">
+                <span>Cancelled</span>
+                <strong>{orders.filter(r => r.status === "Cancelled").length}</strong>
+              </div>
+            </div>
+          )}
+
+          {tab === "Invoices" && invoices.length > 0 && (
+            <div className="si-stats-strip">
+              <div className="si-stat">
+                <span>Total Invoices</span>
+                <strong>{invoices.length}</strong>
+              </div>
+              <div className="si-stat">
+                <span>Invoice Value</span>
+                <strong>{money(invoices.reduce((s, r) => s + Number(r.grandTotal || 0), 0))}</strong>
+              </div>
+              <div className="si-stat si-stat--balance">
+                <span>Outstanding</span>
+                <strong>{money(invoices.reduce((s, r) => s + Math.max(0, Number(r.grandTotal || 0) - Number(r.amountPaid || 0)), 0))}</strong>
+              </div>
+              <div className="si-stat si-stat--paid">
+                <span>Collected</span>
+                <strong>{money(invoices.reduce((s, r) => s + Number(r.amountPaid || 0), 0))}</strong>
+              </div>
+              <div className="si-stat si-stat--overdue">
+                <span>Overdue</span>
+                <strong>{invoices.filter(r => r.dueDate && new Date(r.dueDate) < new Date() && !["Paid", "Void", "Cancelled"].includes(r.status)).length}</strong>
+              </div>
+            </div>
+          )}
+
           <section className="sales-card">
 
             <div className="sales-toolbar">
@@ -1823,91 +1873,48 @@ export default function Sales({ activePage = "Sales" }) {
                     records.map((record) => {
 
                       if (tab === "Orders") {
+                        const customerName = record.customer?.businessName || "?";
+                        const AVATAR_COLORS = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899"];
+                        const avatarColor = AVATAR_COLORS[customerName.charCodeAt(0) % AVATAR_COLORS.length];
 
                         return (
-
-                          <tr key={record.id}>
-
+                          <tr key={record.id} className="si-row">
                             <td>
-
-                              <strong>{record.orderNumber}</strong>
-
+                              <div className="si-inv-num">
+                                <svg className="si-inv-icon" viewBox="0 0 16 16" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1.5" y="3" width="13" height="11" rx="1.5" stroke="currentColor"/><path d="M4 3V2a1 1 0 011-1h6a1 1 0 011 1v1" stroke="currentColor"/><line x1="5" y1="7" x2="11" y2="7" stroke="currentColor" strokeWidth="1"/><line x1="5" y1="9.5" x2="9" y2="9.5" stroke="currentColor" strokeWidth="1"/></svg>
+                                <strong>{record.orderNumber}</strong>
+                              </div>
                             </td>
-
-
-
                             <td>
-
-                              {record.customer?.businessName || "—"}
-
+                              <div className="si-customer">
+                                <span className="si-avatar" style={{ background: avatarColor }}>{customerName.charAt(0).toUpperCase()}</span>
+                                <span className="si-customer-name">{customerName}</span>
+                              </div>
                             </td>
-
-
-
-                            <td>{formatDate(record.orderDate)}</td>
-
-
-
+                            <td className="si-date">{formatDate(record.orderDate)}</td>
                             <td>
-
-                              <span
-
-                                className={`sales-status ${statusClass(
-
-      record.status
-
-    )}`}
-
-                              >
-
-                                {record.status}
-
-                              </span>
-
+                              <span className={`sales-status ${statusClass(record.status)}`}>{record.status}</span>
                             </td>
-
-
-
-                            <td>{money(record.grandTotal)}</td>
-
-
-
+                            <td className="si-amount">{money(record.grandTotal)}</td>
                             <td>
-
-                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-
+                              <div className="si-action-group">
                                 {record.status === "Draft" && (
-                                  <button
-                                    type="button"
-                                    className="sales-secondary"
-                                    onClick={() => openEditOrder(record)}
-                                  >
+                                  <button type="button" className="si-action-btn si-action-btn--edit" title="Edit order" onClick={() => openEditOrder(record)}>
+                                    <svg viewBox="0 0 14 14" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2.5l2 2-6 6H3.5v-2l6-6z"/><path d="M8 4l2 2"/></svg>
                                     Edit
                                   </button>
                                 )}
-
-                                <button
-                                  type="button"
-                                  className="sales-secondary"
-                                  onClick={() => { setAutoPrint(true); setViewOrder(record); }}
-                                >
+                                <button type="button" className="si-action-btn si-action-btn--print" title="Print order" onClick={() => { setAutoPrint(true); setViewOrder(record); }}>
+                                  <svg viewBox="0 0 14 14" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 5V1.5h7V5"/><rect x="1.5" y="5" width="11" height="6" rx="1"/><path d="M3.5 9h7" strokeWidth="1"/><circle cx="11.5" cy="7" r="0.6" fill="currentColor"/></svg>
                                   Print
                                 </button>
-
-                                <button
-                                  type="button"
-                                  className="sales-view-button"
-                                  onClick={() => { setAutoPrint(false); setViewOrder(record); }}
-                                >
+                                <button type="button" className="si-action-btn si-action-btn--preview" title="Preview order" onClick={() => { setAutoPrint(false); setViewOrder(record); }}>
+                                  <svg viewBox="0 0 14 14" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 7s2.5-4.5 6-4.5S13 7 13 7s-2.5 4.5-6 4.5S1 7 1 7z"/><circle cx="7" cy="7" r="1.75"/></svg>
                                   Preview
                                 </button>
-
                               </div>
-
                             </td>
-
                           </tr>
-
                         );
 
                       }
@@ -1915,103 +1922,58 @@ export default function Sales({ activePage = "Sales" }) {
 
 
                       if (tab === "Invoices") {
-
-                        const balance = Math.max(
-
-                          0,
-
-                          Number(record.grandTotal || 0) -
-
-                          Number(record.amountPaid || 0)
-
-                        );
-
-
+                        const balance = Math.max(0, Number(record.grandTotal || 0) - Number(record.amountPaid || 0));
+                        const isOverdue = record.dueDate && new Date(record.dueDate) < new Date() && !["Paid", "Void", "Cancelled"].includes(record.status);
+                        const customerName = record.customer?.businessName || "?";
+                        const AVATAR_COLORS = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899"];
+                        const avatarColor = AVATAR_COLORS[customerName.charCodeAt(0) % AVATAR_COLORS.length];
 
                         return (
-
-                          <tr key={record.id}>
-
+                          <tr key={record.id} className="si-row">
                             <td>
-
-                              <strong>{record.invoiceNumber}</strong>
-
+                              <div className="si-inv-num">
+                                <svg className="si-inv-icon" viewBox="0 0 16 16" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="1.5" width="10" height="13" rx="1.5" stroke="currentColor"/><line x1="5" y1="5" x2="10.5" y2="5" stroke="currentColor" strokeWidth="1"/><line x1="5" y1="7.5" x2="10.5" y2="7.5" stroke="currentColor" strokeWidth="1"/><line x1="5" y1="10" x2="8" y2="10" stroke="currentColor" strokeWidth="1"/></svg>
+                                <strong>{record.invoiceNumber}</strong>
+                              </div>
                             </td>
-
-
-
                             <td>
-
-                              {record.customer?.businessName || "—"}
-
+                              <div className="si-customer">
+                                <span className="si-avatar" style={{ background: avatarColor }}>{customerName.charAt(0).toUpperCase()}</span>
+                                <span className="si-customer-name">{customerName}</span>
+                              </div>
                             </td>
-
-
-
-                            <td>{formatDate(record.invoiceDate)}</td>
-
-
-
-                            <td>{formatDate(record.dueDate)}</td>
-
-
-
+                            <td className="si-date">{formatDate(record.invoiceDate)}</td>
                             <td>
-
-                              <span
-
-                                className={`sales-status ${statusClass(
-
-      record.status
-
-    )}`}
-
-                              >
-
-                                {record.status}
-
-                              </span>
-
+                              <div className={`si-due${isOverdue ? " si-due--overdue" : ""}`}>
+                                {formatDate(record.dueDate)}
+                                {isOverdue && <span className="si-overdue-pill">Overdue</span>}
+                              </div>
                             </td>
-
-
-
-                            <td>{money(record.grandTotal)}</td>
-
-                            <td>{money(record.amountPaid)}</td>
-
-                            <td>{money(balance)}</td>
-
                             <td>
-                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              <span className={`sales-status ${statusClass(record.status)}`}>{record.status}</span>
+                            </td>
+                            <td className="si-amount">{money(record.grandTotal)}</td>
+                            <td className="si-amount si-amount--paid">{money(record.amountPaid)}</td>
+                            <td className={`si-amount ${balance > 0 ? "si-amount--balance" : "si-amount--zero"}`}>{money(balance)}</td>
+                            <td>
+                              <div className="si-action-group">
                                 {!["Paid", "Void", "Cancelled"].includes(record.status) && (
-                                  <button
-                                    type="button"
-                                    className="sales-secondary"
-                                    onClick={() => openEditInvoice(record)}
-                                  >
+                                  <button type="button" className="si-action-btn si-action-btn--edit" title="Edit invoice" onClick={() => openEditInvoice(record)}>
+                                    <svg viewBox="0 0 14 14" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2.5l2 2-6 6H3.5v-2l6-6z"/><path d="M8 4l2 2"/></svg>
                                     Edit
                                   </button>
                                 )}
-                                <button
-                                  type="button"
-                                  className="sales-secondary"
-                                  onClick={() => { setAutoPrintInvoice(true); setViewInvoice(record); }}
-                                >
+                                <button type="button" className="si-action-btn si-action-btn--print" title="Print invoice" onClick={() => { setAutoPrintInvoice(true); setViewInvoice(record); }}>
+                                  <svg viewBox="0 0 14 14" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 5V1.5h7V5"/><rect x="1.5" y="5" width="11" height="6" rx="1"/><path d="M3.5 9h7" strokeWidth="1"/><circle cx="11.5" cy="7" r="0.6" fill="currentColor"/></svg>
                                   Print
                                 </button>
-                                <button
-                                  type="button"
-                                  className="sales-view-button"
-                                  onClick={() => { setAutoPrintInvoice(false); setViewInvoice(record); }}
-                                >
+                                <button type="button" className="si-action-btn si-action-btn--preview" title="Preview invoice" onClick={() => { setAutoPrintInvoice(false); setViewInvoice(record); }}>
+                                  <svg viewBox="0 0 14 14" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 7s2.5-4.5 6-4.5S13 7 13 7s-2.5 4.5-6 4.5S1 7 1 7z"/><circle cx="7" cy="7" r="1.75"/></svg>
                                   Preview
                                 </button>
                               </div>
                             </td>
-
                           </tr>
-
                         );
 
                       }
