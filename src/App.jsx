@@ -12,6 +12,7 @@ import Purchase from "./pages/Purchase";
 import PurchaseDashboard from "./pages/PurchaseDashboard";
 import PurchaseOperations from "./pages/PurchaseOperations";
 import Vendors from "./pages/Vendors";
+import Reports from "./pages/Reports";
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -128,6 +129,12 @@ export default function App() {
                 path="/purchase/vendors"
                 element={<Vendors activePage="Vendor List" />}
               />
+
+              {/* Reports */}
+              <Route path="/reports/profit-loss"   element={<Reports activePage="Profit & Loss" />} />
+              <Route path="/reports/balance-sheet" element={<Reports activePage="Balance Sheet" />} />
+              <Route path="/reports/cash-flow"     element={<Reports activePage="Cash Flow" />} />
+              <Route path="/reports/banking"       element={<Reports activePage="Banking" />} />
             </Route>
 
             <Route

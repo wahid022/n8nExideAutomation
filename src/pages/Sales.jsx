@@ -549,426 +549,17 @@ function OrderDetailsModal({ order, onClose, onEdit, autoPrint = false }) {
         </div>
 
 
-        <header>
-
-          <div>
-
-            <span className="sales-eyebrow">SALES ORDER DETAILS</span>
-
-            <h2 id="order-details-title">
-
-              {order.orderNumber || `Order #${order.id}`}
-
-            </h2>
-
-            <p>
-
-              Created on {formatDate(order.orderDate || order.createdAt)}
-
-            </p>
-
-          </div>
-
-
-
-
-          <button
-
-            type="button"
-
-            className="sales-close"
-
-            onClick={onClose}
-
-            aria-label="Close order details"
-
-          >
-
-            ×
-
-          </button>
-
+        <header style={{ padding: "8px 12px", minHeight: "auto", borderBottom: "none", justifyContent: "flex-end" }}>
+          {order.status === "Draft" && onEdit && (
+            <button type="button" className="si-action-btn si-action-btn--edit" onClick={() => { onClose(); onEdit(order); }}>
+              <svg viewBox="0 0 14 14" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2.5l2 2-6 6H3.5v-2l6-6z"/><path d="M8 4l2 2"/></svg>
+              Edit
+            </button>
+          )}
+          <button type="button" className="sales-close" onClick={onClose} aria-label="Close order details">×</button>
         </header>
 
 
-
-        <div className="sales-details-section">
-
-          <div className="sales-details-heading">
-
-            <h3>Order information</h3>
-
-            <span className={`sales-status ${statusClass(order.status)}`}>
-
-              {order.status || "Pending"}
-
-            </span>
-
-          </div>
-
-
-
-          <div className="sales-details-grid">
-
-            <div>
-
-              <span>Order number</span>
-
-              <strong>{order.orderNumber || "—"}</strong>
-
-            </div>
-
-
-
-            <div>
-
-              <span>Order date</span>
-
-              <strong>{formatDate(order.orderDate)}</strong>
-
-            </div>
-
-
-
-            <div>
-
-              <span>Order ID</span>
-
-              <strong>{order.id ?? "—"}</strong>
-
-            </div>
-
-
-
-            <div>
-
-              <span>Created at</span>
-
-              <strong>{formatDate(order.createdAt)}</strong>
-
-            </div>
-
-          </div>
-
-        </div>
-
-
-
-        <div className="sales-details-section">
-
-          <h3>Customer information</h3>
-
-
-
-          <div className="sales-details-grid">
-
-            <div>
-
-              <span>Business name</span>
-
-              <strong>{customer.businessName || "—"}</strong>
-
-            </div>
-
-
-
-            <div>
-
-              <span>Customer name</span>
-
-              <strong>{customer.contactPerson || customer.name || "—"}</strong>
-
-            </div>
-
-
-
-            <div>
-
-              <span>Phone</span>
-
-              <strong>{customer.phone || "—"}</strong>
-
-            </div>
-
-
-
-            <div>
-
-              <span>Email</span>
-
-              <strong>{customer.email || "—"}</strong>
-
-            </div>
-
-
-
-            <div className="sales-details-full">
-
-              <span>Address</span>
-
-              <strong>
-
-                {[
-
-                  customer.address,
-
-                  customer.city,
-
-                  customer.state,
-
-                  customer.pincode,
-
-                ]
-
-                  .filter(Boolean)
-
-                  .join(", ") || "—"}
-
-              </strong>
-
-            </div>
-
-          </div>
-
-        </div>
-
-
-
-        <div className="sales-details-section">
-
-          <h3>Order items</h3>
-
-
-
-          <div className="sales-table-wrap sales-details-table-wrap">
-
-            <table className="sales-table sales-details-table">
-
-              <thead>
-
-                <tr>
-
-                  <th>Product</th>
-
-                  <th>Code</th>
-
-                  <th>Qty</th>
-
-                  <th>MRP</th>
-
-                  <th>Unit price</th>
-
-                  <th>Discount</th>
-
-                  <th>GST</th>
-
-                  <th>Total</th>
-
-                </tr>
-
-              </thead>
-
-
-
-              <tbody>
-
-                {items.length === 0 ? (
-
-                  <tr>
-
-                    <td colSpan={8} className="sales-empty">
-
-                      No item details available.
-
-                    </td>
-
-                  </tr>
-
-                ) : (
-
-                  items.map((item, index) => {
-
-                    const quantity = Number(item.quantity || 0);
-
-                    const unitPrice = Number(item.unitPrice || 0);
-
-                    const discountPercent = Number(
-
-                      item.discountPercent || 0
-
-                    );
-
-                    const taxPercent = Number(item.taxPercent || 0);
-
-
-
-                    const gross = quantity * unitPrice;
-
-                    const discountAmount =
-
-                      gross * (discountPercent / 100);
-
-                    const taxableAmount = gross - discountAmount;
-
-                    const taxAmount = taxableAmount * (taxPercent / 100);
-
-                    const lineTotal = taxableAmount + taxAmount;
-
-
-
-                    return (
-
-                      <tr key={`${item.productId || item.productCode || index}-${index}`}>
-
-                        <td>
-
-                          <strong>
-
-                            {item.productName || item.name || "—"}
-
-                          </strong>
-
-                          {(item.brand || item.modelSku) && (
-
-                            <small className="sales-item-subtitle">
-
-                              {[item.brand, item.modelSku]
-
-                                .filter(Boolean)
-
-                                .join(" ")}
-
-                            </small>
-
-                          )}
-
-                        </td>
-
-
-
-                        <td>{item.productCode || "—"}</td>
-
-                        <td>{quantity}</td>
-
-                        <td>{money(item.mrp)}</td>
-
-                        <td>{money(unitPrice)}</td>
-
-                        <td>
-
-                          {discountPercent}%{" "}
-
-                          <small>{money(discountAmount)}</small>
-
-                        </td>
-
-                        <td>
-
-                          {taxPercent}%{" "}
-
-                          <small>{money(taxAmount)}</small>
-
-                        </td>
-
-                        <td>
-
-                          <strong>{money(lineTotal)}</strong>
-
-                        </td>
-
-                      </tr>
-
-                    );
-
-                  })
-
-                )}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
-        </div>
-
-
-
-        <div className="sales-details-bottom">
-
-          <div className="sales-details-notes">
-
-            <h3>Notes</h3>
-
-            <p>{order.notes || "No notes added."}</p>
-
-          </div>
-
-
-
-          <div className="sales-totals sales-details-totals">
-
-            <span>
-
-              Subtotal <b>{money(subtotal)}</b>
-
-            </span>
-
-
-
-            <span>
-
-              Discount <b>{money(discount)}</b>
-
-            </span>
-
-
-
-            <span>
-
-              Taxable value <b>{money(taxable)}</b>
-
-            </span>
-
-
-
-            <span>
-
-              GST <b>{money(tax)}</b>
-
-            </span>
-
-
-
-            <span className="sales-grand-total">
-
-              Grand total <b>{money(total)}</b>
-
-            </span>
-
-          </div>
-
-        </div>
-
-
-
-        <footer className="sales-details-footer">
-
-          <button
-
-            type="button"
-
-            className="sales-secondary"
-
-            onClick={onClose}
-
-          >
-
-            Close
-
-          </button>
-
-        </footer>
 
       </section>
 
@@ -1095,108 +686,16 @@ function InvoiceDetailsModal({ invoice, onClose, onEdit, autoPrint = false }) {
           <div className="inv-footer-text">This is a computer-generated tax invoice. Subject to jurisdiction of local courts.</div>
         </div>
 
-        <header>
-          <div>
-            <span className="sales-eyebrow">INVOICE DETAILS</span>
-            <h2 id="invoice-details-title">{invoice.invoiceNumber || `Invoice #${invoice.id}`}</h2>
-            <p>Issued on {formatDate(invoice.invoiceDate)}</p>
-          </div>
+        <header style={{ padding: "8px 12px", minHeight: "auto", borderBottom: "none", justifyContent: "flex-end" }}>
+          {!["Paid", "Void", "Cancelled"].includes(invoice.status) && onEdit && (
+            <button type="button" className="si-action-btn si-action-btn--edit" onClick={() => { onClose(); onEdit(invoice); }}>
+              <svg viewBox="0 0 14 14" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2.5l2 2-6 6H3.5v-2l6-6z"/><path d="M8 4l2 2"/></svg>
+              Edit
+            </button>
+          )}
           <button type="button" className="sales-close" onClick={onClose} aria-label="Close">×</button>
         </header>
 
-        <div className="sales-details-section">
-          <div className="sales-details-heading">
-            <h3>Invoice information</h3>
-            <span className={`sales-status ${statusClass(invoice.status)}`}>{invoice.status || "Draft"}</span>
-          </div>
-          <div className="sales-details-grid">
-            <div><span>Invoice number</span><strong>{invoice.invoiceNumber || "—"}</strong></div>
-            <div><span>Invoice date</span><strong>{formatDate(invoice.invoiceDate)}</strong></div>
-            <div><span>Due date</span><strong>{formatDate(invoice.dueDate) || "—"}</strong></div>
-            <div><span>Balance due</span><strong>{money(balance)}</strong></div>
-          </div>
-        </div>
-
-        <div className="sales-details-section">
-          <h3>Customer information</h3>
-          <div className="sales-details-grid">
-            <div><span>Business name</span><strong>{customer.businessName || "—"}</strong></div>
-            <div><span>Contact</span><strong>{customer.contactPerson || customer.name || "—"}</strong></div>
-            <div><span>Phone</span><strong>{customer.phone || "—"}</strong></div>
-            <div><span>Email</span><strong>{customer.email || "—"}</strong></div>
-            <div className="sales-details-full">
-              <span>Address</span>
-              <strong>{[customer.address, customer.city, customer.state, customer.pincode].filter(Boolean).join(", ") || "—"}</strong>
-            </div>
-          </div>
-        </div>
-
-        <div className="sales-details-section">
-          <h3>Invoice items</h3>
-          <div className="sales-table-wrap sales-details-table-wrap">
-            <table className="sales-table sales-details-table">
-              <thead>
-                <tr>
-                  <th>Product</th><th>Code</th><th>Qty</th><th>MRP</th>
-                  <th>Unit price</th><th>Discount</th><th>GST</th><th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.length === 0 ? (
-                  <tr><td colSpan={8} className="sales-empty">No item details available.</td></tr>
-                ) : (
-                  items.map((item, i) => {
-                    const quantity = Number(item.quantity || 0);
-                    const unitPrice = Number(item.unitPrice || 0);
-                    const discountPercent = Number(item.discountPercent || 0);
-                    const taxPercent = Number(item.taxPercent || 0);
-                    const gross = quantity * unitPrice;
-                    const discountAmount = gross * (discountPercent / 100);
-                    const taxableAmount = gross - discountAmount;
-                    const taxAmount = taxableAmount * (taxPercent / 100);
-                    return (
-                      <tr key={i}>
-                        <td>
-                          <strong>{item.productName || item.name || "—"}</strong>
-                          {(item.brand || item.modelSku) && (
-                            <small className="sales-item-subtitle">{[item.brand, item.modelSku].filter(Boolean).join(" ")}</small>
-                          )}
-                        </td>
-                        <td>{item.productCode || "—"}</td>
-                        <td>{quantity}</td>
-                        <td>{money(item.mrp)}</td>
-                        <td>{money(unitPrice)}</td>
-                        <td>{discountPercent}% <small>{money(discountAmount)}</small></td>
-                        <td>{taxPercent}% <small>{money(taxAmount)}</small></td>
-                        <td><strong>{money(taxableAmount + taxAmount)}</strong></td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="sales-details-bottom">
-          <div className="sales-details-notes">
-            <h3>Notes</h3>
-            <p>{invoice.notes || "No notes added."}</p>
-          </div>
-          <div className="sales-totals sales-details-totals">
-            <span>Subtotal <b>{money(subtotal)}</b></span>
-            <span>Discount <b>{money(discount)}</b></span>
-            <span>Taxable value <b>{money(taxable)}</b></span>
-            <span>GST <b>{money(tax)}</b></span>
-            <span className="sales-grand-total">Grand total <b>{money(total)}</b></span>
-            {paid > 0 && <span>Paid <b>{money(paid)}</b></span>}
-            {paid > 0 && <span className="sales-grand-total">Balance due <b>{money(balance)}</b></span>}
-          </div>
-        </div>
-
-        <footer className="sales-details-footer">
-          <button type="button" className="sales-secondary" onClick={onClose}>Close</button>
-        </footer>
       </section>
     </div>
   );
@@ -1234,7 +733,8 @@ export default function Sales({ activePage = "Sales" }) {
   const customers = customersRaw?.data || [];
   const summary   = summaryRaw         || null;
   const loading   = ordersLoading || invoicesLoading || summaryLoading;
-  const error     = (ordersErr || invoicesErr)?.message || "";
+  const queryError = (ordersErr || invoicesErr)?.message || "";
+  const [error, setError] = useState("");
 
   const [notice, setNotice] = useState("");
 
@@ -1635,6 +1135,7 @@ export default function Sales({ activePage = "Sales" }) {
 
   return (
 
+    <>
     <div className="sales-page-shell">
 
       <Sidebar activePage={activePage} />
@@ -1679,6 +1180,8 @@ export default function Sales({ activePage = "Sales" }) {
 
 
 
+
+          {queryError && <div className="sales-error">{queryError}</div>}
 
           {tab === "Orders" && orders.length > 0 && (
             <div className="si-stats-strip">
@@ -2579,36 +2082,27 @@ export default function Sales({ activePage = "Sales" }) {
     )
 }
 
+    </div>
 
+    {viewOrder && (
+      <OrderDetailsModal
+        order={viewOrder}
+        onClose={() => { setViewOrder(null); setAutoPrint(false); }}
+        onEdit={openEditOrder}
+        autoPrint={autoPrint}
+      />
+    )}
 
-{
-  viewOrder && (
+    {viewInvoice && (
+      <InvoiceDetailsModal
+        invoice={viewInvoice}
+        onClose={() => { setViewInvoice(null); setAutoPrintInvoice(false); }}
+        onEdit={openEditInvoice}
+        autoPrint={autoPrintInvoice}
+      />
+    )}
 
-    <OrderDetailsModal
-
-      order={viewOrder}
-
-      onClose={() => { setViewOrder(null); setAutoPrint(false); }}
-
-      onEdit={openEditOrder}
-
-      autoPrint={autoPrint}
-
-    />
-
-  )
-}
-
-{viewInvoice && (
-  <InvoiceDetailsModal
-    invoice={viewInvoice}
-    onClose={() => { setViewInvoice(null); setAutoPrintInvoice(false); }}
-    onEdit={openEditInvoice}
-    autoPrint={autoPrintInvoice}
-  />
-)}
-
-    </div >
+    </>
 
   );
 

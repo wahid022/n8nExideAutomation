@@ -1619,20 +1619,18 @@ app.patch('/api/purchase/debit-notes/:id/status', requireSupabaseUser, async (re
 });
 
 // Purchase summary
-app.get('/api/purchase/summary', requireSupabaseUser, async (req, res) => {
-  const user = res.locals.authenticatedUser as AuthenticatedUser;
+app.get('/api/purchase/summary', requireSupabaseUser, async (_req, res) => {
   try {
     const r = await pool.query(
       `SELECT
-        (SELECT COUNT(*) FROM public.purchase_orders WHERE created_by=$1)::int AS po_count,
-        (SELECT COALESCE(SUM(grand_total),0) FROM public.purchase_orders WHERE created_by=$1) AS po_value,
-        (SELECT COUNT(*) FROM public.purchase_invoices WHERE created_by=$1)::int AS pi_count,
-        (SELECT COALESCE(SUM(grand_total),0) FROM public.purchase_invoices WHERE created_by=$1) AS pi_value,
-        (SELECT COALESCE(SUM(grand_total),0) FROM public.purchase_invoices WHERE created_by=$1 AND status='Paid') AS paid_value,
-        (SELECT COALESCE(SUM(grand_total),0) FROM public.purchase_invoices WHERE created_by=$1 AND status IN ('Draft','Received','Partially Paid','Overdue')) AS outstanding_value,
-        (SELECT COUNT(*) FROM public.debit_notes WHERE created_by=$1)::int AS dn_count,
-        (SELECT COALESCE(SUM(amount),0) FROM public.debit_notes WHERE created_by=$1) AS dn_total`,
-      [user.id],
+        (SELECT COUNT(*) FROM public.purchase_orders)::int AS po_count,
+        (SELECT COALESCE(SUM(grand_total),0) FROM public.purchase_orders) AS po_value,
+        (SELECT COUNT(*) FROM public.purchase_invoices)::int AS pi_count,
+        (SELECT COALESCE(SUM(grand_total),0) FROM public.purchase_invoices) AS pi_value,
+        (SELECT COALESCE(SUM(grand_total),0) FROM public.purchase_invoices WHERE status='Paid') AS paid_value,
+        (SELECT COALESCE(SUM(grand_total),0) FROM public.purchase_invoices WHERE status IN ('Draft','Received','Partially Paid','Overdue')) AS outstanding_value,
+        (SELECT COUNT(*) FROM public.debit_notes)::int AS dn_count,
+        (SELECT COALESCE(SUM(amount),0) FROM public.debit_notes) AS dn_total`,
     );
     const row = r.rows[0] || {};
     res.json({
@@ -1643,6 +1641,96 @@ app.get('/api/purchase/summary', requireSupabaseUser, async (req, res) => {
       debitNotes: { count: row.dn_count,  total: row.dn_total },
     });
   } catch (e) { console.error('Purchase summary failed:', e); res.status(500).json({ error: 'Unable to load purchase summary.' }); }
+});
+
+// Reports: Profit & Loss
+app.get('/api/reports/profit-loss', requireSupabaseUser, async (req, res) => {
+  const y = new Date().getFullYear();
+  const from = typeof req.query.from === 'string' ? req.query.from : `${y}-01-01`;
+  const to   = typeof req.query.to   === 'string' ? req.query.to   : new Date().toISOString().slice(0, 10);
+  try {
+    const [rev, cogs, cn, dn, monthlyRev, monthlyCogs] = await Promise.all([
+      pool.query(`SELECT COALESCE(SUM(grand_total),0)::numeric AS total FROM public.sales_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void')`, [from, to]),
+      pool.query(`SELECT COALESCE(SUM(grand_total),0)::numeric AS total FROM public.purchase_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void')`, [from, to]),
+      pool.query(`SELECT COALESCE(SUM(amount),0)::numeric AS total FROM public.credit_notes WHERE credit_date BETWEEN $1 AND $2 AND status IN ('Issued','Applied')`, [from, to]),
+      pool.query(`SELECT COALESCE(SUM(amount),0)::numeric AS total FROM public.debit_notes WHERE debit_date BETWEEN $1 AND $2 AND status IN ('Issued','Applied')`, [from, to]),
+      pool.query(`SELECT TO_CHAR(DATE_TRUNC('month',invoice_date),'YYYY-MM') AS month, COALESCE(SUM(grand_total),0)::numeric AS revenue FROM public.sales_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void') GROUP BY DATE_TRUNC('month',invoice_date) ORDER BY DATE_TRUNC('month',invoice_date)`, [from, to]),
+      pool.query(`SELECT TO_CHAR(DATE_TRUNC('month',invoice_date),'YYYY-MM') AS month, COALESCE(SUM(grand_total),0)::numeric AS cogs FROM public.purchase_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void') GROUP BY DATE_TRUNC('month',invoice_date) ORDER BY DATE_TRUNC('month',invoice_date)`, [from, to]),
+    ]);
+    const revenue = Number(rev.rows[0].total);
+    const creditDeductions = Number(cn.rows[0].total);
+    const netRevenue = revenue - creditDeductions;
+    const totalCogs = Number(cogs.rows[0].total);
+    const debitCredits = Number(dn.rows[0].total);
+    const netCogs = totalCogs - debitCredits;
+    const grossProfit = netRevenue - netCogs;
+    const grossMargin = netRevenue > 0 ? Math.round((grossProfit / netRevenue) * 1000) / 10 : 0;
+    const monthMap: Record<string, { revenue: number; cogs: number }> = {};
+    for (const r of monthlyRev.rows) monthMap[r.month] = { revenue: Number(r.revenue), cogs: 0 };
+    for (const r of monthlyCogs.rows) { if (!monthMap[r.month]) monthMap[r.month] = { revenue: 0, cogs: 0 }; monthMap[r.month].cogs = Number(r.cogs); }
+    const monthly = Object.entries(monthMap).sort(([a],[b]) => a.localeCompare(b)).map(([month, v]) => ({ month, revenue: v.revenue, cogs: v.cogs, profit: v.revenue - v.cogs }));
+    res.json({ period: { from, to }, revenue, creditDeductions, netRevenue, totalCogs, debitCredits, netCogs, grossProfit, grossMargin, monthly });
+  } catch (e) { console.error('P&L report failed:', e); res.status(500).json({ error: 'Unable to generate P&L report.' }); }
+});
+
+// Reports: Balance Sheet
+app.get('/api/reports/balance-sheet', requireSupabaseUser, async (_req, res) => {
+  try {
+    const [ar, cash, ap, debitOut] = await Promise.all([
+      pool.query(`SELECT COALESCE(SUM(grand_total),0)::numeric AS total FROM public.sales_invoices WHERE status IN ('Issued','Partially Paid','Overdue')`),
+      pool.query(`SELECT COALESCE(SUM(amount),0)::numeric AS total FROM public.customer_payments WHERE status='Received'`),
+      pool.query(`SELECT COALESCE(SUM(grand_total),0)::numeric AS total FROM public.purchase_invoices WHERE status IN ('Received','Partially Paid','Overdue')`),
+      pool.query(`SELECT COALESCE(SUM(amount),0)::numeric AS total FROM public.debit_notes WHERE status IN ('Issued','Applied')`),
+    ]);
+    const accountsReceivable = Number(ar.rows[0].total);
+    const cashCollected = Number(cash.rows[0].total);
+    const totalAssets = accountsReceivable + cashCollected;
+    const accountsPayable = Number(ap.rows[0].total);
+    const debitNotesPending = Number(debitOut.rows[0].total);
+    const totalLiabilities = accountsPayable;
+    const equity = totalAssets - totalLiabilities;
+    res.json({ asOf: new Date().toISOString().slice(0, 10), assets: { accountsReceivable, cashCollected, totalAssets }, liabilities: { accountsPayable, debitNotesPending, totalLiabilities }, equity });
+  } catch (e) { console.error('Balance sheet failed:', e); res.status(500).json({ error: 'Unable to generate balance sheet.' }); }
+});
+
+// Reports: Cash Flow
+app.get('/api/reports/cash-flow', requireSupabaseUser, async (req, res) => {
+  const y = new Date().getFullYear();
+  const from = typeof req.query.from === 'string' ? req.query.from : `${y}-01-01`;
+  const to   = typeof req.query.to   === 'string' ? req.query.to   : new Date().toISOString().slice(0, 10);
+  try {
+    const [inflow, outflow, monthlyIn, monthlyOut, recent] = await Promise.all([
+      pool.query(`SELECT COALESCE(SUM(amount),0)::numeric AS total FROM public.customer_payments WHERE payment_date BETWEEN $1 AND $2 AND status='Received'`, [from, to]),
+      pool.query(`SELECT COALESCE(SUM(grand_total),0)::numeric AS total FROM public.purchase_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status='Paid'`, [from, to]),
+      pool.query(`SELECT TO_CHAR(DATE_TRUNC('month',payment_date),'YYYY-MM') AS month, COALESCE(SUM(amount),0)::numeric AS inflow FROM public.customer_payments WHERE payment_date BETWEEN $1 AND $2 AND status='Received' GROUP BY DATE_TRUNC('month',payment_date) ORDER BY DATE_TRUNC('month',payment_date)`, [from, to]),
+      pool.query(`SELECT TO_CHAR(DATE_TRUNC('month',invoice_date),'YYYY-MM') AS month, COALESCE(SUM(grand_total),0)::numeric AS outflow FROM public.purchase_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status='Paid' GROUP BY DATE_TRUNC('month',invoice_date) ORDER BY DATE_TRUNC('month',invoice_date)`, [from, to]),
+      pool.query(`SELECT p.receipt_number AS "receiptNumber", p.amount, p.payment_date AS "paymentDate", p.payment_method AS "paymentMethod", p.status, p.customer_snapshot AS customer FROM public.customer_payments p WHERE p.payment_date BETWEEN $1 AND $2 ORDER BY p.payment_date DESC LIMIT 8`, [from, to]),
+    ]);
+    const totalInflow = Number(inflow.rows[0].total);
+    const totalOutflow = Number(outflow.rows[0].total);
+    const monthMap: Record<string, { inflow: number; outflow: number }> = {};
+    for (const r of monthlyIn.rows) monthMap[r.month] = { inflow: Number(r.inflow), outflow: 0 };
+    for (const r of monthlyOut.rows) { if (!monthMap[r.month]) monthMap[r.month] = { inflow: 0, outflow: 0 }; monthMap[r.month].outflow = Number(r.outflow); }
+    const monthly = Object.entries(monthMap).sort(([a],[b]) => a.localeCompare(b)).map(([month, v]) => ({ month, inflow: v.inflow, outflow: v.outflow, net: v.inflow - v.outflow }));
+    res.json({ period: { from, to }, totalInflow, totalOutflow, netCashFlow: totalInflow - totalOutflow, monthly, recentPayments: recent.rows });
+  } catch (e) { console.error('Cash flow report failed:', e); res.status(500).json({ error: 'Unable to generate cash flow report.' }); }
+});
+
+// Reports: Banking
+app.get('/api/reports/banking', requireSupabaseUser, async (req, res) => {
+  const y = new Date().getFullYear();
+  const from = typeof req.query.from === 'string' ? req.query.from : `${y}-01-01`;
+  const to   = typeof req.query.to   === 'string' ? req.query.to   : new Date().toISOString().slice(0, 10);
+  try {
+    const [byMethod, recent, monthly] = await Promise.all([
+      pool.query(`SELECT payment_method AS method, COALESCE(SUM(amount),0)::numeric AS total, COUNT(*)::int AS count FROM public.customer_payments WHERE payment_date BETWEEN $1 AND $2 AND status='Received' GROUP BY payment_method ORDER BY total DESC`, [from, to]),
+      pool.query(`SELECT p.receipt_number AS "receiptNumber", p.amount, p.payment_date AS "paymentDate", p.payment_method AS "paymentMethod", p.reference_number AS "referenceNumber", p.status, p.customer_snapshot AS customer FROM public.customer_payments p WHERE p.payment_date BETWEEN $1 AND $2 ORDER BY p.payment_date DESC LIMIT 20`, [from, to]),
+      pool.query(`SELECT TO_CHAR(DATE_TRUNC('month',payment_date),'YYYY-MM') AS month, COALESCE(SUM(amount),0)::numeric AS total, COUNT(*)::int AS count FROM public.customer_payments WHERE payment_date BETWEEN $1 AND $2 AND status='Received' GROUP BY DATE_TRUNC('month',payment_date) ORDER BY DATE_TRUNC('month',payment_date)`, [from, to]),
+    ]);
+    const grandTotal = byMethod.rows.reduce((s: number, r: { total: string }) => s + Number(r.total), 0);
+    const methods = byMethod.rows.map((r: { method: string; total: string; count: number }) => ({ method: r.method, total: Number(r.total), count: r.count, pct: grandTotal > 0 ? Math.round((Number(r.total) / grandTotal) * 100) : 0 }));
+    res.json({ period: { from, to }, summary: { totalReceived: grandTotal, transactionCount: methods.reduce((s: number, m: { count: number }) => s + m.count, 0) }, byMethod: methods, recentTransactions: recent.rows, monthly: monthly.rows.map((r: { month: string; total: string; count: number }) => ({ month: r.month, total: Number(r.total), count: r.count })) });
+  } catch (e) { console.error('Banking report failed:', e); res.status(500).json({ error: 'Unable to generate banking report.' }); }
 });
 
 // -----------------------------------------------------------------------------

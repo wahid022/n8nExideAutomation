@@ -333,6 +333,7 @@ export default function SalesOperations({ activePage }) {
     : "Manage recurring invoice templates and quotation conversion.";
 
   return (
+    <>
     <div className="sales-page-shell">
       <Sidebar activePage={pageTitle} />
 
@@ -1033,14 +1034,17 @@ export default function SalesOperations({ activePage }) {
         </div>
       )}
 
-      {viewCreditNote && (
-        <CreditNoteModal
-          record={viewCreditNote}
-          autoPrint={autoPrintCreditNote}
-          onClose={() => setViewCreditNote(null)}
-        />
-      )}
     </div>
+
+    {viewCreditNote && (
+      <CreditNoteModal
+        record={viewCreditNote}
+        autoPrint={autoPrintCreditNote}
+        onClose={() => setViewCreditNote(null)}
+      />
+    )}
+
+    </>
   );
 }
 

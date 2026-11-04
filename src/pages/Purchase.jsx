@@ -209,93 +209,9 @@ function PurchaseDocModal({ doc, isInvoice, onClose, autoPrint = false }) {
           <div className="inv-footer-text">This is a computer-generated document. Subject to jurisdiction of local courts.</div>
         </div>
 
-        {/* ── Sidebar details ── */}
-        <header>
-          <div>
-            <span className="sales-eyebrow">{docType}</span>
-            <h2 id="pur-doc-title">{docNum}</h2>
-            <p>{dateLabel}: {fmtDate(docDate)}</p>
-          </div>
+        <header style={{ padding: "8px 12px", minHeight: "auto", borderBottom: "none", justifyContent: "flex-end" }}>
           <button type="button" className="sales-close" onClick={onClose} aria-label="Close">×</button>
         </header>
-
-        <div className="sales-details-section">
-          <div className="sales-details-heading">
-            <h3>Document information</h3>
-            <span className={badgeClass(doc.status)}>{doc.status || "Draft"}</span>
-          </div>
-          <div className="sales-details-grid">
-            <div><span>Document number</span><strong>{docNum}</strong></div>
-            <div><span>{dateLabel}</span><strong>{fmtDate(docDate)}</strong></div>
-            {extraDate && <div><span>{extraLabel}</span><strong>{fmtDate(extraDate)}</strong></div>}
-            <div><span>Grand total</span><strong>{money(total)}</strong></div>
-          </div>
-        </div>
-
-        <div className="sales-details-section">
-          <h3>Vendor information</h3>
-          <div className="sales-details-grid">
-            <div><span>Business name</span><strong>{vendor.businessName || "—"}</strong></div>
-            <div><span>Contact</span><strong>{vendor.contactName || "—"}</strong></div>
-            <div><span>Phone</span><strong>{vendor.phone || "—"}</strong></div>
-            <div><span>GSTIN</span><strong>{vendor.gstin || "—"}</strong></div>
-            <div className="sales-details-full"><span>Address</span><strong>{[vendor.billingAddress, vendor.state].filter(Boolean).join(", ") || "—"}</strong></div>
-          </div>
-        </div>
-
-        <div className="sales-details-section">
-          <h3>Line items</h3>
-          <div className="sales-table-wrap sales-details-table-wrap">
-            <table className="sales-table sales-details-table">
-              <thead>
-                <tr><th>Product</th><th>Code</th><th>Qty</th><th>Unit Price</th><th>Discount</th><th>GST</th><th>Total</th></tr>
-              </thead>
-              <tbody>
-                {items.length === 0 ? (
-                  <tr><td colSpan={7} className="sales-empty">No item details available.</td></tr>
-                ) : items.map((item, i) => {
-                  const q = Number(item.quantity || 0);
-                  const p = Number(item.unitPrice || item.dealerPrice || 0);
-                  const d = Number(item.discountPercent || 0);
-                  const t = Number(item.taxPercent || 0);
-                  const gross = q * p;
-                  const da = gross * d / 100;
-                  const taxableLine = gross - da;
-                  const ga = taxableLine * t / 100;
-                  return (
-                    <tr key={i}>
-                      <td><strong>{item.productName || "—"}</strong>{item.brand && <small className="sales-item-subtitle">{item.brand}</small>}</td>
-                      <td>{item.productCode || "—"}</td>
-                      <td>{q}</td>
-                      <td>{money(p)}</td>
-                      <td>{d}% <small>{money(da)}</small></td>
-                      <td>{t}% <small>{money(ga)}</small></td>
-                      <td><strong>{money(item.lineTotal ?? taxableLine + ga)}</strong></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="sales-details-bottom">
-          <div className="sales-details-notes">
-            <h3>Notes</h3>
-            <p>{doc.notes || "No notes added."}</p>
-          </div>
-          <div className="sales-totals sales-details-totals">
-            <span>Subtotal <b>{money(subtotal)}</b></span>
-            <span>Discount <b>{money(discount)}</b></span>
-            <span>Taxable value <b>{money(taxable)}</b></span>
-            <span>GST <b>{money(tax)}</b></span>
-            <span className="sales-grand-total">Grand total <b>{money(total)}</b></span>
-          </div>
-        </div>
-
-        <footer className="sales-details-footer">
-          <button type="button" className="sales-secondary" onClick={onClose}>Close</button>
-        </footer>
       </section>
     </div>
   );
@@ -393,6 +309,7 @@ export default function Purchase({ activePage }) {
   };
 
   return (
+    <>
     <div className="purchase-page-shell">
       <Sidebar activePage={activePage} />
       <main className="purchase-main">
@@ -575,14 +492,17 @@ export default function Purchase({ activePage }) {
         </div>
       )}
 
-      {viewDoc && (
-        <PurchaseDocModal
-          doc={viewDoc}
-          isInvoice={isInvoice}
-          autoPrint={autoPrintDoc}
-          onClose={() => { setViewDoc(null); setAutoPrintDoc(false); }}
-        />
-      )}
     </div>
+
+    {viewDoc && (
+      <PurchaseDocModal
+        doc={viewDoc}
+        isInvoice={isInvoice}
+        autoPrint={autoPrintDoc}
+        onClose={() => { setViewDoc(null); setAutoPrintDoc(false); }}
+      />
+    )}
+
+    </>
   );
 }

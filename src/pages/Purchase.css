@@ -107,3 +107,5 @@
   .purchase-form-wide { grid-column: auto; }
   .purchase-line { grid-template-columns: 1fr 60px; }
 }
+
+/* Print rules for purchase are in Sales.css (@media print) which is also imported by Purchase.jsx */

@@ -228,6 +228,7 @@ export default function PurchaseOperations({ activePage = "Debit Notes" }) {
   };
 
   return (
+    <>
     <div className="purchase-page-shell">
       <Sidebar activePage={activePage} />
       <main className="purchase-main">
@@ -385,13 +386,16 @@ export default function PurchaseOperations({ activePage = "Debit Notes" }) {
         </div>
       )}
 
-      {viewDn && (
-        <DebitNoteModal
-          dn={viewDn}
-          autoPrint={autoPrintDn}
-          onClose={() => { setViewDn(null); setAutoPrintDn(false); }}
-        />
-      )}
     </div>
+
+    {viewDn && (
+      <DebitNoteModal
+        dn={viewDn}
+        autoPrint={autoPrintDn}
+        onClose={() => { setViewDn(null); setAutoPrintDn(false); }}
+      />
+    )}
+
+    </>
   );
 }

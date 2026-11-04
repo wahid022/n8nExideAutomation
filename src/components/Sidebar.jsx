@@ -114,10 +114,10 @@ const NAV_GROUPS = [
     title: "Reports",
     icon: "reports",
     items: [
-      { label: "Profit & Loss", icon: "profit" },
-      { label: "Balance Sheet", icon: "balance" },
-      { label: "Cash Flow", icon: "cashflow" },
-      { label: "Banking", icon: "banking" },
+      { label: "Profit & Loss", icon: "profit",   path: "/reports/profit-loss" },
+      { label: "Balance Sheet", icon: "balance",  path: "/reports/balance-sheet" },
+      { label: "Cash Flow",     icon: "cashflow", path: "/reports/cash-flow" },
+      { label: "Banking",       icon: "banking",  path: "/reports/banking" },
     ],
   },
   {

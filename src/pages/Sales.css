@@ -768,7 +768,200 @@
 
 /* Hide print document in sidebar-style details modals (has its own sidebar for screen view) */
 .sales-order-details-modal .sales-print-document {
-    display: none;
+    display: block;
+    border-radius: 0;
+}
+
+/* =========================================================
+   INVOICE / ORDER PREVIEW — SCREEN STYLES
+   (inv-* classes also live in @media print below, but these
+   make the preview look good on screen inside the modal)
+   ========================================================= */
+
+.sales-print-document {
+  background: #fff;
+  color: #111827;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 28px 32px 20px;
+  border-bottom: 1.5px solid #E2E8F0;
+}
+
+.inv-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.inv-company { flex: 1; }
+
+.inv-company-name {
+  font-size: 20px;
+  font-weight: 900;
+  color: #17365d;
+  letter-spacing: 0.5px;
+  line-height: 1.1;
+  margin-bottom: 3px;
+}
+
+.inv-company-sub {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.inv-doc-type {
+  font-size: 17px;
+  font-weight: 800;
+  color: #17365d;
+  text-align: right;
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+
+.inv-meta { text-align: right; }
+
+.inv-meta-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.inv-meta-row span {
+  color: #64748b;
+  min-width: 80px;
+  text-align: right;
+}
+
+.inv-meta-row strong {
+  font-weight: 700;
+  color: #111827;
+  min-width: 120px;
+  text-align: left;
+}
+
+.inv-rule {
+  height: 2px;
+  background: #17365d;
+  margin: 14px 0;
+}
+
+.inv-bill-section {
+  margin-bottom: 18px;
+  font-size: 12.5px;
+  color: #374151;
+  line-height: 1.6;
+}
+
+.inv-section-label {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: #17365d;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.inv-cust-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 2px;
+}
+
+.inv-items {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 18px;
+  font-size: 12px;
+}
+
+.inv-items th {
+  background: #17365d;
+  color: #fff;
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.3px;
+  padding: 8px 10px;
+  text-align: left;
+  border: 1px solid #0f2a4a;
+}
+
+.inv-items td {
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  vertical-align: middle;
+  color: #111827;
+  font-size: 12px;
+}
+
+.inv-items tbody tr:nth-child(even) td { background: #f8fafc; }
+.inv-items td strong { font-weight: 700; }
+
+.inv-totals {
+  width: 46%;
+  margin-left: auto;
+  margin-bottom: 20px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.inv-total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #374151;
+}
+
+.inv-grand {
+  background: #17365d;
+  color: #fff;
+  font-weight: 800;
+  font-size: 13.5px;
+  border-bottom: none;
+  padding: 8px 14px;
+}
+
+.inv-notes {
+  font-size: 12px;
+  margin-bottom: 20px;
+  padding: 9px 14px;
+  background: #f9fafb;
+  border-left: 3px solid #17365d;
+  color: #374151;
+}
+
+.inv-signatures {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 28px;
+}
+
+.inv-sig-box {
+  width: 38%;
+  text-align: center;
+  font-size: 12px;
+  color: #374151;
+}
+
+.inv-sig-line {
+  border-top: 1px solid #374151;
+  margin-bottom: 7px;
+}
+
+.inv-footer-text {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 11px;
+  color: #9ca3af;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 10px;
 }
 
 /* =========================================================
@@ -781,21 +974,45 @@
         margin: 14mm 14mm 18mm 14mm;
     }
 
-    /* Hide everything on screen */
-    body * {
-        visibility: hidden !important;
+    /* Hide shell ONLY when a print document is open (modal rendered outside shell).
+       :has() ensures normal Ctrl+P on any page is never blanked out. */
+    body:has(.sales-print-document) .sales-page-shell { display: none !important; }
+    body:has(.sales-print-document) .purchase-page-shell { display: none !important; }
+
+    /* Strip modal backdrop so it flows as normal document content */
+    .sales-modal-backdrop {
+        position: static !important;
+        background: transparent !important;
+        overflow: visible !important;
+        display: block !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
 
-    /* Pull the print document to the very top of the page (covers both modal types) */
-    .sales-print-document,
-    .sales-order-details-modal .sales-print-document {
+    /* Strip modal chrome */
+    .sales-order-details-modal,
+    .sales-modal {
+        position: static !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+        max-height: none !important;
+        border-radius: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+        border: none !important;
+        display: block !important;
+    }
+
+    /* Hide close/edit buttons */
+    .sales-order-details-modal > header,
+    .sales-modal > header { display: none !important; }
+
+    /* Show the invoice document — visibility: visible overrides any global body * { visibility: hidden } */
+    .sales-print-document {
         display: block !important;
         visibility: visible !important;
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        height: auto !important;
         background: #fff !important;
         color: #111827 !important;
         font-family: Arial, Helvetica, sans-serif !important;
@@ -803,8 +1020,9 @@
         line-height: 1.5 !important;
         padding: 0 !important;
         margin: 0 !important;
-        z-index: 9999999 !important;
-        overflow: visible !important;
+        width: 100% !important;
+        border: none !important;
+        border-radius: 0 !important;
         box-sizing: border-box !important;
     }
 
