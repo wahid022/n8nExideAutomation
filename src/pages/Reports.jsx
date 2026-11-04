@@ -27,6 +27,10 @@ function getPreset(key) {
     const qs = new Date(y, Math.floor(m/3)*3, 1);
     return { from: qs.toISOString().slice(0,10), to: TODAY };
   }
+  if (key === "this-fy") {
+    const fyYear = m >= 3 ? y : y - 1;
+    return { from: `${fyYear}-04-01`, to: TODAY };
+  }
   return { from: `${y}-01-01`, to: TODAY };
 }
 
@@ -63,7 +67,7 @@ function BarChart({ data = [], bar1Key, bar2Key, bar1Color = "#4f46e5", bar2Colo
 }
 
 
-function Loading() { return <div className="rpt-loading"><div className="rpt-spinner"/><span>Loading report…</span></div>; }
+function Loading() { return <div className="rpt-loading"><div className="rpt-spinner"/><span>Loading report&hellip;</span></div>; }
 function ErrorMsg({ msg }) { return <div className="sales-error" style={{ margin: "20px 0" }}>{msg || "Failed to load report."}</div>; }
 
 function KpiCard({ label, value, sub, accent = "blue", icon }) {
@@ -82,7 +86,7 @@ function KpiCard({ label, value, sub, accent = "blue", icon }) {
 const METHOD_COLOR = { UPI: "#8b5cf6", NEFT: "#0ea5e9", Cheque: "#f59e0b", Cash: "#059669", RTGS: "#4f46e5", "Bank Transfer": "#0d9488", Other: "#94a3b8" };
 const methodColor = (m) => METHOD_COLOR[m] || METHOD_COLOR.Other;
 
-function TallyLedger({ title, leftRows, rightRows }) {
+function TallyLedger({ leftRows, rightRows }) {
   const maxLen = Math.max(leftRows.length, rightRows.length);
   const EMPTY = { type: "empty", label: "" };
   const left  = [...leftRows,  ...Array(Math.max(0, maxLen - leftRows.length)).fill(EMPTY)];
@@ -110,7 +114,6 @@ function TallyLedger({ title, leftRows, rightRows }) {
 
   return (
     <div className="sd-card rpt-ledger-card">
-      {title && <div className="sd-card-header"><h2>{title}</h2></div>}
       <div className="rpt-ledger-wrap">
         <table className="rpt-ledger-table">
           <thead><tr>
@@ -144,11 +147,15 @@ function ProfitLoss({ from, to }) {
   if (error) return <ErrorMsg msg={error.message} />;
   if (!data) return null;
 
-  const { netRevenue, netCogs, grossProfit, grossMargin, revenue, creditDeductions, totalCogs, debitCredits, monthly } = data;
+  const { netRevenue, netCogs, grossProfit, grossMargin, revenue, creditDeductions, totalCogs, debitCredits, monthly, revenueByGst = [], cogsByGst = [] } = data;
 
   const drRows = [];
   drRows.push({ label: "Purchase Accounts", type: "section" });
-  drRows.push({ label: "Purchase Invoices (Received)", sub: totalCogs, indent: 1 });
+  if (cogsByGst.length > 0) {
+    for (const g of cogsByGst) drRows.push({ label: g.label, sub: g.taxable, indent: 1 });
+  } else {
+    drRows.push({ label: "Purchase Invoices (Received)", sub: totalCogs, indent: 1 });
+  }
   if (debitCredits > 0) drRows.push({ label: "Less: Debit Notes", sub: -debitCredits, indent: 1 });
   drRows.push({ label: " ", total: netCogs });
   drRows.push({ type: "empty" });
@@ -161,7 +168,11 @@ function ProfitLoss({ from, to }) {
 
   const crRows = [];
   crRows.push({ label: "Sales Accounts", type: "section" });
-  crRows.push({ label: "Gross Sales (Invoices)", sub: revenue, indent: 1 });
+  if (revenueByGst.length > 0) {
+    for (const g of revenueByGst) crRows.push({ label: g.label, sub: g.taxable, indent: 1 });
+  } else {
+    crRows.push({ label: "Gross Sales (Invoices)", sub: revenue, indent: 1 });
+  }
   if (creditDeductions > 0) crRows.push({ label: "Less: Credit Notes", sub: -creditDeductions, indent: 1 });
   crRows.push({ label: " ", total: netRevenue });
   crRows.push({ type: "empty" });
@@ -174,10 +185,21 @@ function ProfitLoss({ from, to }) {
 
   return (
     <div className="rpt-section">
-      <div className="rpt-period-label">Period: {fmtDate(from)} — {fmtDate(to)}</div>
-      <TallyLedger title="Profit & Loss Account" leftRows={drRows} rightRows={crRows} />
+      <div className="rpt-report-actions">
+        <div className="rpt-period-label">Period: {fmtDate(from)} — {fmtDate(to)}</div>
+        <button className="rpt-print-btn" onClick={() => window.print()}>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print / Export PDF
+        </button>
+      </div>
+      <div className="rpt-print-header">
+        <div className="rpt-print-company">Bharat Batteries</div>
+        <div className="rpt-print-title">Profit &amp; Loss Account</div>
+        <div className="rpt-print-period">{fmtDate(from)} to {fmtDate(to)}</div>
+      </div>
+      <TallyLedger leftRows={drRows} rightRows={crRows} />
       {monthly.length > 0 && (
-        <div className="sd-card">
+        <div className="sd-card rpt-no-print">
           <div className="sd-card-header">
             <h2>Monthly Revenue vs Cost</h2>
             <div className="rpt-legend">
@@ -204,37 +226,73 @@ function BalanceSheet() {
   if (error) return <ErrorMsg msg={error.message} />;
   if (!data) return null;
 
-  const { assets, liabilities, equity, asOf } = data;
-  const grandTotal = assets.totalAssets;
+  const { assets, liabilities, asOf } = data;
+  const plProfit = liabilities.plProfit ?? 0;
+  const gstPos = liabilities.gstPosition || {};
+
+  // Group AP by vendor
+  const apByVendor = {};
+  for (const r of (liabilities.apDetail || [])) {
+    if (!apByVendor[r.vendorName]) apByVendor[r.vendorName] = { name: r.vendorName, total: 0, invoices: [] };
+    apByVendor[r.vendorName].total += r.outstanding;
+    apByVendor[r.vendorName].invoices.push(r);
+  }
 
   const liabRows = [];
   liabRows.push({ label: "Current Liabilities", type: "section" });
-  liabRows.push({ label: "Accounts Payable (Purchases)", sub: liabilities.accountsPayable, indent: 1 });
-  if (liabilities.debitNotesPending > 0) liabRows.push({ label: "Debit Notes Pending", sub: liabilities.debitNotesPending, indent: 1 });
-  liabRows.push({ label: " ", total: liabilities.totalLiabilities });
+  liabRows.push({ label: "Sundry Creditors", type: "subsection" });
+  for (const v of Object.values(apByVendor)) {
+    liabRows.push({ label: v.name, sub: v.total, indent: 2 });
+    for (const inv of v.invoices) {
+      liabRows.push({ label: `${inv.invoiceNumber}  ${fmtDate(inv.dueDate)}`, sub: inv.outstanding, indent: 3, type: "detail" });
+    }
+  }
+  if (Object.keys(apByVendor).length === 0) liabRows.push({ label: "No outstanding payables", sub: 0, indent: 2 });
+  liabRows.push({ label: "Total Sundry Creditors", total: liabilities.accountsPayable });
   liabRows.push({ type: "empty" });
-  liabRows.push({ label: "Profit & Loss A/c  (Net Worth)", type: "section" });
-  liabRows.push({ label: "Current Period Profit", sub: equity, indent: 1 });
-  liabRows.push({ label: " ", total: equity });
+  liabRows.push({ label: "Duties & Taxes", type: "subsection" });
+  liabRows.push({ label: "Output GST (Sales)", sub: gstPos.outputGst || 0, indent: 2 });
+  liabRows.push({ label: "Less: Input GST (Purchases)", sub: -(gstPos.inputGst || 0), indent: 2 });
+  liabRows.push({ label: "Net GST Payable", total: Math.max(0, gstPos.netGstPayable || 0) });
+  liabRows.push({ type: "empty" });
+  liabRows.push({ label: "Profit & Loss A/c", type: "subsection" });
+  liabRows.push({ label: "Current Period Profit (Gross)", sub: plProfit, indent: 2 });
+  liabRows.push({ label: " ", total: plProfit });
   liabRows.push({ type: "divider" });
-  liabRows.push({ label: "Total", total: grandTotal, type: "total" });
+  liabRows.push({ label: "Total", total: liabilities.totalLiabilities, type: "total" });
 
   const assetRows = [];
   assetRows.push({ label: "Current Assets", type: "section" });
+  assetRows.push({ label: "Sundry Debtors  (Accounts Receivable)", type: "subsection" });
+  for (const c of (assets.arDetail || [])) {
+    assetRows.push({ label: c.name, sub: c.total, indent: 2 });
+    for (const inv of c.invoices) {
+      assetRows.push({ label: `${inv.invoiceNumber}  Due ${fmtDate(inv.dueDate)}${inv.status === "Overdue" ? " !" : ""}`, sub: inv.outstanding, indent: 3, type: inv.status === "Overdue" ? "detail-overdue" : "detail" });
+    }
+  }
+  if ((assets.arDetail || []).length === 0) assetRows.push({ label: "No outstanding receivables", sub: 0, indent: 2 });
+  assetRows.push({ label: "Total Sundry Debtors", total: assets.accountsReceivable });
+  assetRows.push({ type: "empty" });
   assetRows.push({ label: "Cash-in-Hand & Bank  (Collected)", sub: assets.cashCollected, indent: 1 });
-  assetRows.push({ label: "Sundry Debtors  (Accounts Receivable)", sub: assets.accountsReceivable, indent: 1 });
   assetRows.push({ label: " ", total: assets.totalAssets });
-  assetRows.push({ type: "empty" });
-  assetRows.push({ type: "empty" });
-  assetRows.push({ type: "empty" });
-  assetRows.push({ type: "empty" });
   assetRows.push({ type: "divider" });
-  assetRows.push({ label: "Total", total: grandTotal, type: "total" });
+  assetRows.push({ label: "Total", total: assets.totalAssets, type: "total" });
 
   return (
     <div className="rpt-section">
-      <div className="rpt-period-label">As at {fmtDate(asOf)}</div>
-      <TallyLedger title="Balance Sheet" leftRows={liabRows} rightRows={assetRows} />
+      <div className="rpt-report-actions">
+        <div className="rpt-period-label">As at {fmtDate(asOf)}</div>
+        <button className="rpt-print-btn" onClick={() => window.print()}>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print / Export PDF
+        </button>
+      </div>
+      <div className="rpt-print-header">
+        <div className="rpt-print-company">Bharat Batteries</div>
+        <div className="rpt-print-title">Balance Sheet</div>
+        <div className="rpt-print-period">As at {fmtDate(asOf)}</div>
+      </div>
+      <TallyLedger leftRows={liabRows} rightRows={assetRows} />
     </div>
   );
 }
@@ -361,7 +419,7 @@ function Banking({ from, to }) {
               <div key={m.method} className="rpt-method-card" style={{ borderLeftColor: methodColor(m.method) }}>
                 <div className="rpt-method-name" style={{ color: methodColor(m.method) }}>{m.method}</div>
                 <div className="rpt-method-amount">{money(m.total)}</div>
-                <div className="rpt-method-meta">{m.count} transaction{m.count !== 1 ? "s" : ""} · {m.pct}%</div>
+                <div className="rpt-method-meta">{m.count} transaction{m.count !== 1 ? "s" : ""} &middot; {m.pct}%</div>
                 <div className="rpt-method-bar"><div style={{ width: `${m.pct}%`, background: methodColor(m.method) }}/></div>
               </div>
             ))}
@@ -404,8 +462,8 @@ const TABS = [
 export default function Reports({ activePage }) {
   const navigate = useNavigate();
   const [tab, setTab] = useState(TAB_BY_PAGE[activePage] || "pl");
-  const [preset, setPreset] = useState("this-year");
-  const [dateRange, setDateRange] = useState(getPreset("this-year"));
+  const [preset, setPreset] = useState("this-fy");
+  const [dateRange, setDateRange] = useState(getPreset("this-fy"));
 
   useEffect(() => {
     if (TAB_BY_PAGE[activePage]) setTab(TAB_BY_PAGE[activePage]);
@@ -425,7 +483,7 @@ export default function Reports({ activePage }) {
       <main className="sales-main">
         <Topbar activePage={activePage} />
         <div className="rpt-content">
-          <div className="sd-header">
+          <div className="sd-header rpt-no-print">
             <div>
               <span className="sales-eyebrow">BUSINESS MANAGEMENT</span>
               <h1 style={{ fontSize: 26, fontWeight: 800, margin: "5px 0", color: "#0F172A", letterSpacing: "-0.3px" }}>Reports</h1>
@@ -433,7 +491,7 @@ export default function Reports({ activePage }) {
             </div>
           </div>
 
-          <div className="rpt-topbar">
+          <div className="rpt-topbar rpt-no-print">
             <div className="rpt-tabs">
               {TABS.map(t => (
                 <button key={t.key} className={`rpt-tab ${tab === t.key ? "rpt-tab--active" : ""}`} onClick={() => handleTab(t.key)}>
@@ -444,14 +502,14 @@ export default function Reports({ activePage }) {
 
             {hasDateFilter && (
               <div className="rpt-date-bar">
-                {["this-month","this-quarter","this-year"].map(p => (
+                {["this-month","this-quarter","this-fy"].map(p => (
                   <button key={p} className={`rpt-preset ${preset === p ? "rpt-preset--active" : ""}`} onClick={() => setPresetRange(p)}>
-                    {p === "this-month" ? "This Month" : p === "this-quarter" ? "This Quarter" : "This Year"}
+                    {p === "this-month" ? "This Month" : p === "this-quarter" ? "This Quarter" : "This FY"}
                   </button>
                 ))}
                 <div className="rpt-custom-range">
                   <input type="date" value={dateRange.from} onChange={e => { setPreset("custom"); setDateRange(d => ({...d, from: e.target.value})); }} />
-                  <span>—</span>
+                  <span>&mdash;</span>
                   <input type="date" value={dateRange.to} onChange={e => { setPreset("custom"); setDateRange(d => ({...d, to: e.target.value})); }} />
                 </div>
               </div>

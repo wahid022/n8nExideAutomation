@@ -1645,17 +1645,41 @@ app.get('/api/purchase/summary', requireSupabaseUser, async (_req, res) => {
 
 // Reports: Profit & Loss
 app.get('/api/reports/profit-loss', requireSupabaseUser, async (req, res) => {
-  const y = new Date().getFullYear();
-  const from = typeof req.query.from === 'string' ? req.query.from : `${y}-01-01`;
-  const to   = typeof req.query.to   === 'string' ? req.query.to   : new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const y = now.getFullYear();
+  const fyYear = now.getMonth() >= 3 ? y : y - 1;
+  const from = typeof req.query.from === 'string' ? req.query.from : `${fyYear}-04-01`;
+  const to   = typeof req.query.to   === 'string' ? req.query.to   : now.toISOString().slice(0, 10);
   try {
-    const [rev, cogs, cn, dn, monthlyRev, monthlyCogs] = await Promise.all([
-      pool.query(`SELECT COALESCE(SUM(grand_total),0)::numeric AS total FROM public.sales_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void')`, [from, to]),
-      pool.query(`SELECT COALESCE(SUM(grand_total),0)::numeric AS total FROM public.purchase_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void')`, [from, to]),
+    const [rev, cogs, cn, dn, revByGstRes, cogsByGstRes, monthlyRev, monthlyCogs] = await Promise.all([
+      pool.query(`SELECT COALESCE(SUM(taxable_value),0)::numeric AS total FROM public.sales_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void')`, [from, to]),
+      pool.query(`SELECT COALESCE(SUM(taxable_value),0)::numeric AS total FROM public.purchase_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void')`, [from, to]),
       pool.query(`SELECT COALESCE(SUM(amount),0)::numeric AS total FROM public.credit_notes WHERE credit_date BETWEEN $1 AND $2 AND status IN ('Issued','Applied')`, [from, to]),
       pool.query(`SELECT COALESCE(SUM(amount),0)::numeric AS total FROM public.debit_notes WHERE debit_date BETWEEN $1 AND $2 AND status IN ('Issued','Applied')`, [from, to]),
-      pool.query(`SELECT TO_CHAR(DATE_TRUNC('month',invoice_date),'YYYY-MM') AS month, COALESCE(SUM(grand_total),0)::numeric AS revenue FROM public.sales_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void') GROUP BY DATE_TRUNC('month',invoice_date) ORDER BY DATE_TRUNC('month',invoice_date)`, [from, to]),
-      pool.query(`SELECT TO_CHAR(DATE_TRUNC('month',invoice_date),'YYYY-MM') AS month, COALESCE(SUM(grand_total),0)::numeric AS cogs FROM public.purchase_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void') GROUP BY DATE_TRUNC('month',invoice_date) ORDER BY DATE_TRUNC('month',invoice_date)`, [from, to]),
+      pool.query(`
+        SELECT gst_rate, SUM(taxable)::numeric AS taxable, SUM(tax_amt)::numeric AS tax_amt
+        FROM (
+          SELECT
+            COALESCE((item->>'gstRate')::numeric, (item->>'taxPercent')::numeric, 0) AS gst_rate,
+            COALESCE((item->>'taxableValue')::numeric, (item->>'unitPrice')::numeric * COALESCE((item->>'quantity')::numeric,1), 0) AS taxable,
+            COALESCE((item->>'taxAmt')::numeric, 0) AS tax_amt
+          FROM public.sales_invoices si, jsonb_array_elements(si.items) AS item
+          WHERE si.invoice_date BETWEEN $1 AND $2 AND si.status NOT IN ('Draft','Void')
+        ) t GROUP BY gst_rate ORDER BY gst_rate
+      `, [from, to]),
+      pool.query(`
+        SELECT gst_rate, SUM(taxable)::numeric AS taxable, SUM(tax_amt)::numeric AS tax_amt
+        FROM (
+          SELECT
+            COALESCE((item->>'gstRate')::numeric, (item->>'taxPercent')::numeric, 0) AS gst_rate,
+            COALESCE((item->>'taxableValue')::numeric, (item->>'unitPrice')::numeric * COALESCE((item->>'quantity')::numeric,1), 0) AS taxable,
+            COALESCE((item->>'taxAmt')::numeric, 0) AS tax_amt
+          FROM public.purchase_invoices pi, jsonb_array_elements(pi.items) AS item
+          WHERE pi.invoice_date BETWEEN $1 AND $2 AND pi.status NOT IN ('Draft','Void')
+        ) t GROUP BY gst_rate ORDER BY gst_rate
+      `, [from, to]),
+      pool.query(`SELECT TO_CHAR(DATE_TRUNC('month',invoice_date),'YYYY-MM') AS month, COALESCE(SUM(taxable_value),0)::numeric AS revenue FROM public.sales_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void') GROUP BY DATE_TRUNC('month',invoice_date) ORDER BY DATE_TRUNC('month',invoice_date)`, [from, to]),
+      pool.query(`SELECT TO_CHAR(DATE_TRUNC('month',invoice_date),'YYYY-MM') AS month, COALESCE(SUM(taxable_value),0)::numeric AS cogs FROM public.purchase_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void') GROUP BY DATE_TRUNC('month',invoice_date) ORDER BY DATE_TRUNC('month',invoice_date)`, [from, to]),
     ]);
     const revenue = Number(rev.rows[0].total);
     const creditDeductions = Number(cn.rows[0].total);
@@ -1665,31 +1689,100 @@ app.get('/api/reports/profit-loss', requireSupabaseUser, async (req, res) => {
     const netCogs = totalCogs - debitCredits;
     const grossProfit = netRevenue - netCogs;
     const grossMargin = netRevenue > 0 ? Math.round((grossProfit / netRevenue) * 1000) / 10 : 0;
+    const revenueByGst = revByGstRes.rows.map(r => ({
+      rate: Number(r.gst_rate),
+      taxable: Number(r.taxable),
+      taxAmt: Number(r.tax_amt),
+      label: Number(r.gst_rate) === 0 ? 'Sales @0% (Non-GST)' : `Sales @${Number(r.gst_rate)}%`,
+    }));
+    const cogsByGst = cogsByGstRes.rows.map(r => ({
+      rate: Number(r.gst_rate),
+      taxable: Number(r.taxable),
+      taxAmt: Number(r.tax_amt),
+      label: Number(r.gst_rate) === 0 ? 'Purchase @0% (Non-GST)' : `Purchase @${Number(r.gst_rate)}%`,
+    }));
     const monthMap: Record<string, { revenue: number; cogs: number }> = {};
     for (const r of monthlyRev.rows) monthMap[r.month] = { revenue: Number(r.revenue), cogs: 0 };
     for (const r of monthlyCogs.rows) { if (!monthMap[r.month]) monthMap[r.month] = { revenue: 0, cogs: 0 }; monthMap[r.month].cogs = Number(r.cogs); }
     const monthly = Object.entries(monthMap).sort(([a],[b]) => a.localeCompare(b)).map(([month, v]) => ({ month, revenue: v.revenue, cogs: v.cogs, profit: v.revenue - v.cogs }));
-    res.json({ period: { from, to }, revenue, creditDeductions, netRevenue, totalCogs, debitCredits, netCogs, grossProfit, grossMargin, monthly });
+    res.json({ period: { from, to }, revenue, creditDeductions, netRevenue, totalCogs, debitCredits, netCogs, grossProfit, grossMargin, revenueByGst, cogsByGst, monthly });
   } catch (e) { console.error('P&L report failed:', e); res.status(500).json({ error: 'Unable to generate P&L report.' }); }
 });
 
 // Reports: Balance Sheet
 app.get('/api/reports/balance-sheet', requireSupabaseUser, async (_req, res) => {
   try {
-    const [ar, cash, ap, debitOut] = await Promise.all([
-      pool.query(`SELECT COALESCE(SUM(grand_total),0)::numeric AS total FROM public.sales_invoices WHERE status IN ('Issued','Partially Paid','Overdue')`),
+    const [arRows, cashTotal, apRows, outputGst, inputGst, plRevRow, plCogsRow, plCnRow, plDnRow] = await Promise.all([
+      pool.query(`
+        SELECT
+          si.invoice_number,
+          si.invoice_date,
+          si.due_date,
+          si.status,
+          si.grand_total,
+          COALESCE(SUM(cp.amount), 0) AS paid,
+          si.grand_total - COALESCE(SUM(cp.amount), 0) AS outstanding,
+          COALESCE(si.customer_snapshot->>'businessName', si.customer_snapshot->>'name', 'Unknown') AS customer_name
+        FROM public.sales_invoices si
+        LEFT JOIN public.customer_payments cp ON cp.invoice_id = si.id AND cp.status = 'Received'
+        WHERE si.status IN ('Issued', 'Partially Paid', 'Overdue')
+        GROUP BY si.id, si.invoice_number, si.invoice_date, si.due_date, si.status, si.grand_total, si.customer_snapshot
+        ORDER BY customer_name, si.due_date
+      `),
       pool.query(`SELECT COALESCE(SUM(amount),0)::numeric AS total FROM public.customer_payments WHERE status='Received'`),
-      pool.query(`SELECT COALESCE(SUM(grand_total),0)::numeric AS total FROM public.purchase_invoices WHERE status IN ('Received','Partially Paid','Overdue')`),
+      pool.query(`
+        SELECT
+          pi.invoice_number,
+          pi.invoice_date,
+          pi.due_date,
+          pi.status,
+          pi.grand_total AS outstanding,
+          COALESCE(pi.vendor_snapshot->>'businessName', pi.vendor_snapshot->>'name', 'Unknown') AS vendor_name
+        FROM public.purchase_invoices pi
+        WHERE pi.status IN ('Received', 'Partially Paid', 'Overdue')
+        ORDER BY vendor_name, pi.due_date
+      `),
+      pool.query(`SELECT COALESCE(SUM(tax_total),0)::numeric AS total FROM public.sales_invoices WHERE status NOT IN ('Draft','Void')`),
+      pool.query(`SELECT COALESCE(SUM(tax_total),0)::numeric AS total FROM public.purchase_invoices WHERE status NOT IN ('Draft','Void')`),
+      pool.query(`SELECT COALESCE(SUM(taxable_value),0)::numeric AS total FROM public.sales_invoices WHERE status NOT IN ('Draft','Void')`),
+      pool.query(`SELECT COALESCE(SUM(taxable_value),0)::numeric AS total FROM public.purchase_invoices WHERE status NOT IN ('Draft','Void')`),
+      pool.query(`SELECT COALESCE(SUM(amount),0)::numeric AS total FROM public.credit_notes WHERE status IN ('Issued','Applied')`),
       pool.query(`SELECT COALESCE(SUM(amount),0)::numeric AS total FROM public.debit_notes WHERE status IN ('Issued','Applied')`),
     ]);
-    const accountsReceivable = Number(ar.rows[0].total);
-    const cashCollected = Number(cash.rows[0].total);
+
+    const accountsReceivable = arRows.rows.reduce((s: number, r: any) => s + Number(r.outstanding), 0);
+    const cashCollected = Number(cashTotal.rows[0].total);
     const totalAssets = accountsReceivable + cashCollected;
-    const accountsPayable = Number(ap.rows[0].total);
-    const debitNotesPending = Number(debitOut.rows[0].total);
-    const totalLiabilities = accountsPayable;
-    const equity = totalAssets - totalLiabilities;
-    res.json({ asOf: new Date().toISOString().slice(0, 10), assets: { accountsReceivable, cashCollected, totalAssets }, liabilities: { accountsPayable, debitNotesPending, totalLiabilities }, equity });
+
+    const accountsPayable = apRows.rows.reduce((s: number, r: any) => s + Number(r.outstanding), 0);
+    const outputGstTotal = Number(outputGst.rows[0].total);
+    const inputGstTotal = Number(inputGst.rows[0].total);
+    const netGstPayable = outputGstTotal - inputGstTotal;
+    // P&L profit: use taxable_value (strips GST) — avoids inflated residual from mixing grand totals with net GST liability
+    const plProfit = (Number(plRevRow.rows[0].total) - Number(plCnRow.rows[0].total)) - (Number(plCogsRow.rows[0].total) - Number(plDnRow.rows[0].total));
+    const totalLiabilities = accountsPayable + Math.max(0, netGstPayable) + plProfit;
+
+    const arByCust: Record<string, { name: string; total: number; invoices: any[] }> = {};
+    for (const r of arRows.rows) {
+      const name = String(r.customer_name);
+      if (!arByCust[name]) arByCust[name] = { name, total: 0, invoices: [] };
+      const outstanding = Number(r.outstanding);
+      arByCust[name].total += outstanding;
+      arByCust[name].invoices.push({ invoiceNumber: r.invoice_number, invoiceDate: r.invoice_date, dueDate: r.due_date, status: r.status, grandTotal: Number(r.grand_total), paid: Number(r.paid), outstanding });
+    }
+
+    res.json({
+      asOf: new Date().toISOString().slice(0, 10),
+      assets: { accountsReceivable, arDetail: Object.values(arByCust), cashCollected, totalAssets },
+      liabilities: {
+        accountsPayable,
+        apDetail: apRows.rows.map((r: any) => ({ vendorName: String(r.vendor_name), invoiceNumber: r.invoice_number, invoiceDate: r.invoice_date, dueDate: r.due_date, status: r.status, outstanding: Number(r.outstanding) })),
+        gstPosition: { outputGst: outputGstTotal, inputGst: inputGstTotal, netGstPayable },
+        plProfit,
+        totalLiabilities,
+      },
+      equity: plProfit,
+    });
   } catch (e) { console.error('Balance sheet failed:', e); res.status(500).json({ error: 'Unable to generate balance sheet.' }); }
 });
 

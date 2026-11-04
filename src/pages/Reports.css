@@ -340,3 +340,112 @@ tr.rpt-lr--empty td {
   .rpt-ledger-wrap { flex-direction: column; }
   .rpt-ledger-vline { width: 100%; height: 2px; }
 }
+
+/* Subsection header (within a section) */
+tr.rpt-lr--subsection td {
+  color: #374151;
+  font-weight: 700;
+  font-size: 11.5px;
+  background: #F8FAFC;
+  border-top: 1px solid #E2E8F0;
+  padding-top: 7px !important;
+  padding-bottom: 7px !important;
+}
+
+/* Small invoice-level detail rows */
+tr.rpt-lr--detail td {
+  color: #64748B;
+  font-size: 11px;
+  font-style: italic;
+  border-bottom-color: transparent;
+}
+
+/* Overdue detail row */
+tr.rpt-lr--detail-overdue td {
+  color: #DC2626;
+  font-size: 11px;
+  font-style: italic;
+  border-bottom-color: transparent;
+}
+
+/* Report actions bar (period label + print button) */
+.rpt-report-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rpt-print-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 9px;
+  background: #fff;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+.rpt-print-btn:hover { background: #F1F5F9; border-color: #CBD5E1; }
+
+/* Print header — hidden on screen, shown when printing */
+.rpt-print-header { display: none; }
+
+/* ── Print styles ── */
+@media print {
+  /* Hide chrome */
+  .sidebar,
+  .bb-sidebar,
+  .topbar,
+  .rpt-topbar,
+  .rpt-no-print,
+  .rpt-report-actions {
+    display: none !important;
+  }
+
+  /* Show company header */
+  .rpt-print-header {
+    display: block;
+    text-align: center;
+    padding: 0 0 16px;
+    border-bottom: 2px solid #0F172A;
+    margin-bottom: 20px;
+  }
+  .rpt-print-company {
+    font-size: 18px;
+    font-weight: 800;
+    color: #0F172A;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .rpt-print-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #374151;
+    margin-top: 4px;
+  }
+  .rpt-print-period {
+    font-size: 12px;
+    color: #64748B;
+    margin-top: 2px;
+  }
+
+  /* Page */
+  @page { size: A4 landscape; margin: 12mm 15mm; }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Layout reset */
+  .sales-page-shell { display: block !important; }
+  .sales-main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+  .rpt-content { padding: 0 !important; gap: 0 !important; }
+  .sd-card { box-shadow: none !important; border: 1px solid #CBD5E1 !important; border-radius: 0 !important; }
+
+  /* Ledger */
+  .rpt-ledger-wrap { page-break-inside: avoid; }
+  .rpt-ledger-table { font-size: 10.5px; }
+  .rpt-ledger-table td { padding: 4px 10px; }
+}

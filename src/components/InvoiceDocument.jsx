@@ -67,24 +67,25 @@ export default function InvoiceDocument({
         </thead>
         <tbody>
           {items.map((item, i) => {
-            const q = Number(item.quantity || 0);
-            const p = Number(item.unitPrice ?? item.dealerPrice ?? 0);
-            const d = Number(item.discountPercent || 0);
-            const t = Number(item.taxPercent ?? 18);
+            const q = Number(item.quantity ?? item.qty ?? 0);
+            const p = Number(item.unitPrice ?? item.rate ?? item.dealerPrice ?? 0);
+            const d = Number(item.discountPercent ?? item.discountPct ?? 0);
+            const t = Number(item.taxPercent ?? item.gstRate ?? 18);
             const gross = q * p;
             const da = gross * d / 100;
             const taxableLine = gross - da;
             const ga = taxableLine * t / 100;
+            const lineTotal = item.lineTotal ?? item.total ?? (taxableLine + ga);
             return (
               <tr key={i}>
                 <td>{i + 1}</td>
-                <td>{item.productName || item.name || "—"}</td>
+                <td>{item.productName || item.name || item.description || "—"}</td>
                 <td>{item.productCode || "—"}</td>
                 <td>{q}</td>
                 <td>{money(p)}</td>
                 <td>{d > 0 ? `${d}% (${money(da)})` : "—"}</td>
                 <td>{t}% ({money(ga)})</td>
-                <td><strong>{money(item.lineTotal ?? taxableLine + ga)}</strong></td>
+                <td><strong>{money(lineTotal)}</strong></td>
               </tr>
             );
           })}
