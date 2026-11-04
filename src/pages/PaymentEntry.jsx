@@ -3,6 +3,7 @@ import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-quer
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { api } from "../lib/api";
+import { QK } from "../lib/queryKeys";
 import { money, today, formatDate, statusClass } from "../lib/formatters";
 import { useDebounce } from "../hooks/useDebounce";
 import "./Sales.css";
@@ -13,13 +14,13 @@ export default function PaymentEntry({ activePage = "Payment Entry" }) {
   const debouncedSearch = useDebounce(search, 200);
 
   const { data: paymentsRaw, isLoading: loading } = useQuery({
-    queryKey: ["sales-payments", debouncedSearch],
+    queryKey: [QK.salesPayments, debouncedSearch],
     queryFn: () => api(`/sales/payments?search=${encodeURIComponent(debouncedSearch)}`),
     staleTime: 20_000,
     placeholderData: keepPreviousData,
   });
-  const { data: invoicesRaw } = useQuery({ queryKey: ["sales-invoices", ""], queryFn: () => api("/sales/invoices?search="), staleTime: 20_000 });
-  const { data: customersRaw } = useQuery({ queryKey: ["customers"], queryFn: () => api("/customers"), staleTime: 60_000 });
+  const { data: invoicesRaw } = useQuery({ queryKey: [QK.salesInvoices, ""], queryFn: () => api("/sales/invoices?search="), staleTime: 20_000 });
+  const { data: customersRaw } = useQuery({ queryKey: [QK.customers], queryFn: () => api("/customers"), staleTime: 60_000 });
 
   const payments  = paymentsRaw?.data  || [];
   const invoices  = invoicesRaw?.data  || [];
@@ -91,9 +92,9 @@ export default function PaymentEntry({ activePage = "Payment Entry" }) {
 
       setNotice("Payment recorded successfully.");
       setModal(false);
-      qc.invalidateQueries({ queryKey: ["sales-payments"] });
-      qc.invalidateQueries({ queryKey: ["sales-invoices"] });
-      qc.invalidateQueries({ queryKey: ["sales-summary"] });
+      qc.invalidateQueries({ queryKey: [QK.salesPayments] });
+      qc.invalidateQueries({ queryKey: [QK.salesInvoices] });
+      qc.invalidateQueries({ queryKey: [QK.salesSummary] });
     } catch (e) {
       setError(e.message || "Unable to save payment.");
     } finally {

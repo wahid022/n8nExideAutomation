@@ -3,6 +3,7 @@ import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-quer
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { api } from "../lib/api";
+import { QK } from "../lib/queryKeys";
 import { avatarColor } from "../lib/formatters";
 import { useDebounce } from "../hooks/useDebounce";
 import "./Customers.css";
@@ -15,7 +16,7 @@ export default function Customers({ activePage = "Customers" }) {
   const debouncedSearch = useDebounce(search, 250);
 
   const { data: customersRaw, isLoading: loading } = useQuery({
-    queryKey: ["customers", debouncedSearch],
+    queryKey: [QK.customers, debouncedSearch],
     queryFn: () => api(`/customers?search=${encodeURIComponent(debouncedSearch)}`),
     staleTime: 20_000,
     placeholderData: keepPreviousData,
@@ -41,7 +42,7 @@ export default function Customers({ activePage = "Customers" }) {
       const result = await api(editingId ? `/customers/${encodeURIComponent(editingId)}` : "/customers", { method: editingId ? "PATCH" : "POST", body: JSON.stringify(form) });
       setNotice(editingId ? "Customer updated successfully." : "Customer created successfully.");
       setModalOpen(false); setForm(EMPTY); setEditingId(null);
-      qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: [QK.customers] });
       if (!editingId && result.customer) setSearch(result.customer.businessName || result.customer.phone || "");
     } catch (e) { setError(e.message || "Unable to save customer."); }
     finally { setSaving(false); }

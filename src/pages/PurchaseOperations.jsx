@@ -3,6 +3,7 @@ import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-quer
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { api } from "../lib/api";
+import { QK } from "../lib/queryKeys";
 import { money, today, fmtDate, avatarColor } from "../lib/formatters";
 import { useDebounce } from "../hooks/useDebounce";
 import { useAutoPrint } from "../hooks/useAutoPrint";
@@ -124,9 +125,9 @@ export default function PurchaseOperations({ activePage = "Debit Notes" }) {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 200);
 
-  const { data: vendorsRaw } = useQuery({ queryKey: ["vendors"], queryFn: () => api("/vendors"), staleTime: 60_000 });
+  const { data: vendorsRaw } = useQuery({ queryKey: [QK.vendors], queryFn: () => api("/vendors"), staleTime: 60_000 });
   const { data: rowsRaw, isLoading: loading } = useQuery({
-    queryKey: ["purchase-debit-notes", debouncedSearch],
+    queryKey: [QK.purchaseDebitNotes, debouncedSearch],
     queryFn: () => api(`/purchase/debit-notes${debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : ""}`),
     staleTime: 20_000,
     placeholderData: keepPreviousData,
@@ -188,7 +189,7 @@ export default function PurchaseOperations({ activePage = "Debit Notes" }) {
       await api(path, { method: editingId ? "PUT" : "POST", body: JSON.stringify(payload) });
       setNotice(editingId ? "Debit Note updated." : "Debit Note saved.");
       setModal(false);
-      qc.invalidateQueries({ queryKey: ["purchase-debit-notes"] });
+      qc.invalidateQueries({ queryKey: [QK.purchaseDebitNotes] });
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   };
@@ -196,7 +197,7 @@ export default function PurchaseOperations({ activePage = "Debit Notes" }) {
   const updateStatus = async (row, status) => {
     try {
       await api(`/purchase/debit-notes/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
-      qc.invalidateQueries({ queryKey: ["purchase-debit-notes"] });
+      qc.invalidateQueries({ queryKey: [QK.purchaseDebitNotes] });
     } catch (e) { setError(e.message); }
   };
 

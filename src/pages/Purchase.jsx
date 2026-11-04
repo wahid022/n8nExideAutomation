@@ -3,6 +3,7 @@ import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-quer
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { api } from "../lib/api";
+import { QK } from "../lib/queryKeys";
 import { money, today, fmtDate, avatarColor } from "../lib/formatters";
 import { useDebounce } from "../hooks/useDebounce";
 import { useAutoPrint } from "../hooks/useAutoPrint";
@@ -95,7 +96,7 @@ export default function Purchase({ activePage }) {
   const docNumKey = isInvoice ? "invoiceNumber" : "orderNumber";
   const docDateKey = isInvoice ? "invoiceDate"  : "orderDate";
 
-  const { data: vendorsRaw } = useQuery({ queryKey: ["vendors"], queryFn: () => api("/vendors"), staleTime: 60_000 });
+  const { data: vendorsRaw } = useQuery({ queryKey: [QK.vendors], queryFn: () => api("/vendors"), staleTime: 60_000 });
   const { data: rowsRaw, isLoading: loading } = useQuery({
     queryKey: [qKey, debouncedSearch],
     queryFn: () => api(`${apiPath}${debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : ""}`),
@@ -155,7 +156,7 @@ export default function Purchase({ activePage }) {
       setNotice(editingId ? `${activePage} updated.` : `${activePage} saved.`);
       setModal(false);
       qc.invalidateQueries({ queryKey: [qKey] });
-      qc.invalidateQueries({ queryKey: ["purchase-summary"] });
+      qc.invalidateQueries({ queryKey: [QK.purchaseSummary] });
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   };

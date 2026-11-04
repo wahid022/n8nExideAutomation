@@ -3,6 +3,7 @@ import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-quer
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { api } from "../lib/api";
+import { QK } from "../lib/queryKeys";
 import { money, today, fmtDate } from "../lib/formatters";
 import { useDebounce } from "../hooks/useDebounce";
 import { useAutoPrint } from "../hooks/useAutoPrint";
@@ -51,7 +52,7 @@ export default function SalesOperations({ activePage }) {
     "Recurring Invoices": "sales-recurring-invoices",
   };
 
-  const { data: customersRaw } = useQuery({ queryKey: ["customers"], queryFn: () => api("/customers"), staleTime: 60_000 });
+  const { data: customersRaw } = useQuery({ queryKey: [QK.customers], queryFn: () => api("/customers"), staleTime: 60_000 });
   const { data: rowsRaw, isLoading, error: rowsErr } = useQuery({
     queryKey: [TAB_KEYS[tab] || tab, debouncedSearch],
     queryFn: () => {

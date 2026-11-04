@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { api } from "../lib/api";
+import { QK } from "../lib/queryKeys";
 import { moneyCompact } from "../lib/formatters";
 import DonutChart from "../components/DonutChart";
 import "./Sales.css";
@@ -55,8 +56,8 @@ function IconAlert() {
 export default function SalesDashboard({ activePage = "Sales Dashboard" }) {
   const navigate = useNavigate();
 
-  const { data: summaryRaw, isLoading: sumLoading, error: sumErr } = useQuery({ queryKey: ["sales-summary"], queryFn: () => api("/sales/summary"), staleTime: 20_000 });
-  const { data: ordersRaw,  isLoading: ordLoading                 } = useQuery({ queryKey: ["sales-orders", ""], queryFn: () => api("/sales/orders?search="), staleTime: 20_000 });
+  const { data: summaryRaw, isLoading: sumLoading, error: sumErr } = useQuery({ queryKey: [QK.salesSummary], queryFn: () => api("/sales/summary"), staleTime: 20_000 });
+  const { data: ordersRaw,  isLoading: ordLoading                 } = useQuery({ queryKey: [QK.salesOrders, ""], queryFn: () => api("/sales/orders?search="), staleTime: 20_000 });
 
   const summary = summaryRaw     || null;
   const orders  = ordersRaw?.data || [];

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-quer
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { api } from "../lib/api";
+import { QK } from "../lib/queryKeys";
 import { avatarColor } from "../lib/formatters";
 import { useDebounce } from "../hooks/useDebounce";
 import "./Purchase.css";
@@ -27,7 +28,7 @@ export default function Vendors({ activePage = "Vendor List" }) {
   const debouncedSearch = useDebounce(search, 250);
 
   const { data: vendorsRaw, isLoading: loading } = useQuery({
-    queryKey: ["vendors", debouncedSearch],
+    queryKey: [QK.vendors, debouncedSearch],
     queryFn: () => api(`/vendors?search=${encodeURIComponent(debouncedSearch)}`),
     staleTime: 20_000,
     placeholderData: keepPreviousData,
@@ -57,7 +58,7 @@ export default function Vendors({ activePage = "Vendor List" }) {
       );
       setNotice(editingId ? "Vendor updated successfully." : "Vendor created successfully.");
       setModalOpen(false); setForm(EMPTY); setEditingId(null);
-      qc.invalidateQueries({ queryKey: ["vendors"] });
+      qc.invalidateQueries({ queryKey: [QK.vendors] });
       if (!editingId && result.vendor) setSearch(result.vendor.businessName || result.vendor.phone || "");
     } catch (e) { setError(e.message || "Unable to save vendor."); }
     finally { setSaving(false); }

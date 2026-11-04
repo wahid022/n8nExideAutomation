@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { api } from "../lib/api";
+import { QK } from "../lib/queryKeys";
 import { moneyCompact as money, fmtDate } from "../lib/formatters";
 import DonutChart from "../components/DonutChart";
 import "./Sales.css";
@@ -135,7 +136,7 @@ function TallyLedger({ title, leftRows, rightRows }) {
 
 function ProfitLoss({ from, to }) {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["reports-pl", from, to],
+    queryKey: [QK.reportsPL, from, to],
     queryFn: () => api(`/reports/profit-loss?from=${from}&to=${to}`),
     staleTime: 60_000,
   });
@@ -195,7 +196,7 @@ function ProfitLoss({ from, to }) {
 
 function BalanceSheet() {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["reports-bs"],
+    queryKey: [QK.reportsBS],
     queryFn: () => api("/reports/balance-sheet"),
     staleTime: 60_000,
   });
@@ -240,7 +241,7 @@ function BalanceSheet() {
 
 function CashFlow({ from, to }) {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["reports-cf", from, to],
+    queryKey: [QK.reportsCF, from, to],
     queryFn: () => api(`/reports/cash-flow?from=${from}&to=${to}`),
     staleTime: 60_000,
   });
@@ -301,7 +302,7 @@ function CashFlow({ from, to }) {
 
 function Banking({ from, to }) {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["reports-banking", from, to],
+    queryKey: [QK.reportsBanking, from, to],
     queryFn: () => api(`/reports/banking?from=${from}&to=${to}`),
     staleTime: 60_000,
   });

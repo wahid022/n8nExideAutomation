@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { api } from "../lib/api";
+import { QK } from "../lib/queryKeys";
 import { money, today, formatDate, statusClass } from "../lib/formatters";
 import { useDebounce } from "../hooks/useDebounce";
 import { useAutoPrint } from "../hooks/useAutoPrint";
@@ -173,10 +174,10 @@ export default function Sales({ activePage = "Sales" }) {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 200);
 
-  const { data: ordersRaw,   isLoading: ordersLoading,   error: ordersErr   } = useQuery({ queryKey: ["sales-orders",   debouncedSearch], queryFn: () => api(`/sales/orders?search=${encodeURIComponent(debouncedSearch)}`),   staleTime: 20_000, placeholderData: keepPreviousData });
-  const { data: invoicesRaw, isLoading: invoicesLoading, error: invoicesErr } = useQuery({ queryKey: ["sales-invoices", debouncedSearch], queryFn: () => api(`/sales/invoices?search=${encodeURIComponent(debouncedSearch)}`), staleTime: 20_000, placeholderData: keepPreviousData });
-  const { data: customersRaw } = useQuery({ queryKey: ["customers"], queryFn: () => api("/customers"), staleTime: 60_000 });
-  const { data: summaryRaw,   isLoading: summaryLoading  } = useQuery({ queryKey: ["sales-summary"], queryFn: () => api("/sales/summary"), staleTime: 20_000 });
+  const { data: ordersRaw,   isLoading: ordersLoading,   error: ordersErr   } = useQuery({ queryKey: [QK.salesOrders,   debouncedSearch], queryFn: () => api(`/sales/orders?search=${encodeURIComponent(debouncedSearch)}`),   staleTime: 20_000, placeholderData: keepPreviousData });
+  const { data: invoicesRaw, isLoading: invoicesLoading, error: invoicesErr } = useQuery({ queryKey: [QK.salesInvoices, debouncedSearch], queryFn: () => api(`/sales/invoices?search=${encodeURIComponent(debouncedSearch)}`), staleTime: 20_000, placeholderData: keepPreviousData });
+  const { data: customersRaw } = useQuery({ queryKey: [QK.customers], queryFn: () => api("/customers"), staleTime: 60_000 });
+  const { data: summaryRaw,   isLoading: summaryLoading  } = useQuery({ queryKey: [QK.salesSummary], queryFn: () => api("/sales/summary"), staleTime: 20_000 });
 
   const orders    = ordersRaw?.data    || [];
   const invoices  = invoicesRaw?.data  || [];
@@ -522,9 +523,9 @@ export default function Sales({ activePage = "Sales" }) {
       setEditingInvoice(null);
       setModal(false);
 
-      qc.invalidateQueries({ queryKey: ["sales-orders"] });
-      qc.invalidateQueries({ queryKey: ["sales-invoices"] });
-      qc.invalidateQueries({ queryKey: ["sales-summary"] });
+      qc.invalidateQueries({ queryKey: [QK.salesOrders] });
+      qc.invalidateQueries({ queryKey: [QK.salesInvoices] });
+      qc.invalidateQueries({ queryKey: [QK.salesSummary] });
 
     } catch (e) {
 
