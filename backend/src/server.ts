@@ -1222,6 +1222,27 @@ app.post('/api/sales/challans', requireSupabaseUser, async (req, res) => {
     await client.query(`INSERT INTO public.sales_document_audit(document_type,document_id,action,after_data,actor_id) VALUES('Delivery Challan',$1,'created',$2::jsonb,$3)`, [r.rows[0].id, JSON.stringify(r.rows[0]), user.id]); await client.query('COMMIT'); res.status(201).json({ success: true, challan: r.rows[0] });
   } catch (e) { await client.query('ROLLBACK').catch(() => undefined); const pe = e as { code?: string }; if (pe.code === '23505') { res.status(409).json({ error: 'Challan number already exists.' }); return; } console.error('Challan create failed:', e); res.status(500).json({ error: 'Unable to create challan.' }); } finally { client.release(); }
 });
+app.put('/api/sales/challans/:id', requireSupabaseUser, async (req, res) => {
+  const id = validCustomerId(req.params.id);
+  if (!id) { res.status(400).json({ error: 'Invalid challan ID.' }); return; }
+  const user = res.locals.authenticatedUser as AuthenticatedUser; const b = req.body as Record<string, unknown>;
+  const customer = b.customer && typeof b.customer === 'object' ? customerSnapshot(b.customer as Record<string, unknown>) : null;
+  const lines = buildSalesLines(b.items); const customerId = validCustomerId(customer?.id); const number = typeof b.challanNumber === 'string' ? b.challanNumber.trim().slice(0, 80) : '';
+  const date = typeof b.challanDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.challanDate) ? b.challanDate : new Date().toISOString().slice(0, 10);
+  if (!number || !customerId || !customer?.businessName || !lines) { res.status(400).json({ error: 'Provide a challan number, saved customer and valid item lines.' }); return; }
+  const client = await pool.connect(); try {
+    await client.query('BEGIN');
+    const existing = await client.query('SELECT id, status FROM public.delivery_challans WHERE id=$1 FOR UPDATE', [id]);
+    if (!existing.rowCount) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Challan not found.' }); return; }
+    if (existing.rows[0].status !== 'Draft') { await client.query('ROLLBACK'); res.status(409).json({ error: 'Only Draft challans can be edited.' }); return; }
+    const c = await client.query('SELECT id FROM public.customers WHERE id=$1', [customerId]);
+    if (!c.rowCount) { await client.query('ROLLBACK'); res.status(400).json({ error: 'Customer not found.' }); return; }
+    const r = await client.query(`UPDATE public.delivery_challans SET challan_number=$2,customer_id=$3,customer_snapshot=$4::jsonb,items=$5::jsonb,challan_date=$6,notes=NULLIF($7,''),updated_at=NOW() WHERE id=$1 RETURNING id,challan_number AS "challanNumber",status`, [id, number, customerId, JSON.stringify(customer), JSON.stringify(lines.lines), date, typeof b.notes === 'string' ? b.notes.slice(0, 2000) : '']);
+    await client.query(`INSERT INTO public.sales_document_audit(document_type,document_id,action,after_data,actor_id) VALUES('Delivery Challan',$1,'updated',$2::jsonb,$3)`, [id, JSON.stringify(r.rows[0]), user.id]);
+    await client.query('COMMIT'); res.json({ success: true, challan: r.rows[0] });
+  } catch (e) { await client.query('ROLLBACK').catch(() => undefined); const pe = e as { code?: string }; if (pe.code === '23505') { res.status(409).json({ error: 'Challan number already exists.' }); return; } console.error('Challan update failed:', e); res.status(500).json({ error: 'Unable to update challan.' }); } finally { client.release(); }
+});
+
 app.patch('/api/sales/challans/:id/status', requireSupabaseUser, async (req, res) => { const id = validCustomerId(req.params.id); const status = String(req.body?.status || ''); if (!id || !['Dispatched', 'Delivered', 'Cancelled'].includes(status)) { res.status(400).json({ error: 'Invalid challan or status.' }); return; } try { const r = await pool.query(`UPDATE public.delivery_challans SET status=$2,updated_at=NOW() WHERE id=$1 AND status<>'Cancelled' RETURNING id,status`, [id, status]); if (!r.rowCount) { res.status(404).json({ error: 'Challan not found or already cancelled.' }); return; } res.json({ success: true, challan: r.rows[0] }); } catch (e) { res.status(500).json({ error: 'Unable to update challan status.' }); } });
 
 app.get('/api/sales/credit-notes', requireSupabaseUser, async (req, res) => { const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : ''; try { const r = await pool.query(`SELECT cn.id,cn.credit_note_number AS "creditNoteNumber",cn.invoice_id AS "invoiceId",cn.customer_id AS "customerId",cn.customer_snapshot AS customer,cn.items,cn.credit_date AS "creditDate",cn.amount,cn.reason,cn.status,si.invoice_number AS "invoiceNumber" FROM public.credit_notes cn LEFT JOIN public.sales_invoices si ON si.id=cn.invoice_id WHERE ($1='' OR cn.credit_note_number ILIKE $2 OR cn.customer_snapshot->>'businessName' ILIKE $2) ORDER BY cn.created_at DESC LIMIT 200`, [search, `%${search.replace(/[\\%_]/g, '\\$&')}%`]); res.json({ data: r.rows }); } catch (e) { res.status(500).json({ error: 'Unable to load credit notes.' }); } });

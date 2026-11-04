@@ -80,6 +80,7 @@ export default function SalesOperations({ activePage }) {
 
   const [form, setForm] = useState({});
   const [modal, setModal] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -135,6 +136,7 @@ export default function SalesOperations({ activePage }) {
   }, [load]);
 
   const open = () => {
+    setEditingId(null);
     setError("");
     setNotice("");
 
@@ -164,7 +166,40 @@ export default function SalesOperations({ activePage }) {
     });
 
     setModal(true);
+  };
 
+  const openEdit = (row) => {
+    setEditingId(row.id);
+    setError("");
+    setNotice("");
+    setForm({
+      number: row.challanNumber,
+      customerId: String(row.customerId),
+      date: String(row.challanDate || "").slice(0, 10) || today(),
+      amount: "",
+      reason: "",
+      invoiceId: "",
+      frequency: "Monthly",
+      nextRunDate: today(),
+      endDate: "",
+      dueDays: 30,
+      items: Array.isArray(row.items) && row.items.length > 0
+        ? row.items.map((item) => ({
+            productName: item.productName || "",
+            productCode: item.productCode || "",
+            productId: item.productId || "",
+            productSearch: item.productName
+              ? `${item.productName}${item.productCode ? ` — ${item.productCode}` : ""}`
+              : "",
+            quantity: item.quantity || 1,
+            unitPrice: 0,
+            discountPercent: 0,
+            taxPercent: 18,
+          }))
+        : [blankItem()],
+      notes: row.notes || "",
+    });
+    setModal(true);
   };
 
   const searchProducts = useCallback(
@@ -200,7 +235,7 @@ export default function SalesOperations({ activePage }) {
       let payload;
 
       if (tab === "Delivery Challans") {
-        path = "/sales/challans";
+        path = editingId ? `/sales/challans/${editingId}` : "/sales/challans";
 
         payload = {
           challanNumber: form.number,
@@ -244,13 +279,13 @@ export default function SalesOperations({ activePage }) {
       }
 
       await api(path, {
-        method: "POST",
+        method: editingId ? "PUT" : "POST",
         body: JSON.stringify(payload),
       });
 
       setNotice(
         tab === "Delivery Challans"
-          ? "Delivery Challan saved."
+          ? editingId ? "Delivery Challan updated." : "Delivery Challan saved."
           : tab === "Credit Notes"
           ? "Credit Note saved."
           : "Recurring Invoice saved."
@@ -410,9 +445,8 @@ export default function SalesOperations({ activePage }) {
                     <thead>
                       <tr>
                         <th>Document</th>
-                        <th>Customer</th>
-                        <th>Date / Next run</th>
-                        <th>Details</th>
+                        <th>{tab === "Recurring Invoices" ? "Next run" : "Date"}</th>
+                        <th>Items</th>
                         <th>Status</th>
                         <th>Action</th>
                       </tr>
@@ -421,47 +455,93 @@ export default function SalesOperations({ activePage }) {
                     <tbody>
                       {rows.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="sales-empty">
+                          <td colSpan="5" className="sales-empty">
                             No records found.
                           </td>
                         </tr>
                       ) : (
-                        rows.map((r) => (
+                        rows.map((r) => {
+                          const rawDate = r.challanDate || r.creditDate || r.nextRunDate || "";
+                          const formattedDate = rawDate
+                            ? new Date(rawDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                            : "—";
+
+                          const statusStyles = {
+                            Draft:       { background: "#fef3c7", color: "#92400e" },
+                            Dispatched:  { background: "#dbeafe", color: "#1e40af" },
+                            Delivered:   { background: "#dcfce7", color: "#166534" },
+                            Cancelled:   { background: "#fee2e2", color: "#991b1b" },
+                            Issued:      { background: "#dbeafe", color: "#1e40af" },
+                            Applied:     { background: "#dcfce7", color: "#166534" },
+                            Void:        { background: "#fee2e2", color: "#991b1b" },
+                            Active:      { background: "#dcfce7", color: "#166534" },
+                            Paused:      { background: "#f1f5f9", color: "#475569" },
+                          };
+                          const statusLabel = r.status || (r.active ? "Active" : "Paused");
+                          const badgeStyle = statusStyles[statusLabel] || { background: "#f1f5f9", color: "#475569" };
+
+                          const itemSummary = (() => {
+                            if (tab === "Credit Notes") return money(r.amount);
+                            if (tab === "Recurring Invoices") return `${r.frequency} · every cycle`;
+                            if (!Array.isArray(r.items) || r.items.length === 0) return "—";
+                            const first = r.items[0];
+                            const totalQty = r.items.reduce((s, x) => s + Number(x.quantity || 0), 0);
+                            const label = first.productName || first.productCode || "Item";
+                            const truncated = label.length > 32 ? label.slice(0, 32) + "…" : label;
+                            return r.items.length === 1
+                              ? `${truncated} × ${totalQty}`
+                              : `${truncated} +${r.items.length - 1} more · Qty ${totalQty}`;
+                          })();
+
+                          return (
                           <tr key={r.id}>
+                            {/* Document + Customer stacked */}
                             <td>
-                              <strong>{r[titleKey]}</strong>
+                              <strong style={{ display: "block", color: "#172b4d" }}>{r[titleKey]}</strong>
+                              <span style={{ fontSize: "0.82em", color: "#64748b" }}>
+                                {r.customer?.businessName || `Customer #${r.customerId || "—"}`}
+                              </span>
+                            </td>
+
+                            <td style={{ whiteSpace: "nowrap" }}>{formattedDate}</td>
+
+                            {/* Items + Notes stacked */}
+                            <td>
+                              <span style={{ display: "block" }}>{itemSummary}</span>
+                              {tab === "Delivery Challans" && r.notes && (
+                                <span style={{ fontSize: "0.8em", color: "#94a3b8", display: "block", marginTop: 2 }}>
+                                  {r.notes.length > 55 ? r.notes.slice(0, 55) + "…" : r.notes}
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Colored status badge */}
+                            <td>
+                              <span style={{
+                                display: "inline-block",
+                                padding: "3px 10px",
+                                borderRadius: 999,
+                                fontSize: "0.78em",
+                                fontWeight: 600,
+                                letterSpacing: "0.02em",
+                                ...badgeStyle,
+                              }}>
+                                {statusLabel}
+                              </span>
                             </td>
 
                             <td>
-                              {r.customer?.businessName ||
-                                `Customer #${r.customerId || "—"}`}
-                            </td>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {tab === "Delivery Challans" &&
+                                r.status === "Draft" && (
+                                  <button
+                                    className="sales-secondary"
+                                    onClick={() => openEdit(r)}
+                                  >
+                                    Edit
+                                  </button>
+                                )}
 
-                            <td>
-                              {String(
-                                r.challanDate ||
-                                  r.creditDate ||
-                                  r.nextRunDate ||
-                                  ""
-                              ).slice(0, 10)}
-                            </td>
-
-                            <td>
-                              {tab === "Credit Notes"
-                                ? money(r.amount)
-                                : tab === "Recurring Invoices"
-                                ? `${r.frequency} · every cycle`
-                                : Array.isArray(r.items)
-                                ? `${r.items.length} item line(s)`
-                                : "—"}
-                            </td>
-
-                            <td>
-                              {r.status ||
-                                (r.active ? "Active" : "Paused")}
-                            </td>
-
-                            <td>
                               {tab === "Delivery Challans" &&
                                 r.status !== "Delivered" &&
                                 r.status !== "Cancelled" && (
@@ -544,9 +624,11 @@ export default function SalesOperations({ activePage }) {
                                   {r.active ? "Pause" : "Activate"}
                                 </button>
                               )}
+                              </div>
                             </td>
                           </tr>
-                        ))
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -567,7 +649,7 @@ export default function SalesOperations({ activePage }) {
           >
             <header>
               <div>
-                <h2>New {tab.toLowerCase()}</h2>
+                <h2>{editingId ? "Edit" : "New"} {tab.toLowerCase()}</h2>
                 <p>
                   Server-side validation is applied before saving.
                 </p>

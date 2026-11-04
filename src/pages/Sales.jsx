@@ -390,7 +390,14 @@ function ProductPicker({ line, onChange }) {
 
 
 
-function OrderDetailsModal({ order, onClose, onEdit }) {
+function OrderDetailsModal({ order, onClose, onEdit, autoPrint = false }) {
+
+  useEffect(() => {
+    if (autoPrint && order) {
+      const timer = setTimeout(() => window.print(), 250);
+      return () => clearTimeout(timer);
+    }
+  }, [autoPrint, order]);
 
   if (!order) return null;
 
@@ -442,24 +449,102 @@ function OrderDetailsModal({ order, onClose, onEdit }) {
 
       >
         <div className="sales-print-document">
-          <div className="print-company"><h1>BHARAT BATTERIES</h1><p>SALES ORDER</p></div>
-          <div className="print-order-meta">
-            <div><span>Order No.</span><strong>{order.orderNumber || `Order #${order.id}`}</strong></div>
-            <div><span>Order Date</span><strong>{formatDate(order.orderDate || order.createdAt)}</strong></div>
-            <div><span>Status</span><strong>{order.status || "Pending"}</strong></div>
+          {/* Invoice header: company left, order details right */}
+          <div className="inv-header">
+            <div className="inv-company">
+              <div className="inv-company-name">BHARAT BATTERIES</div>
+              <div className="inv-company-sub">Your Trusted Partner in Power Solutions</div>
+            </div>
+            <div className="inv-meta">
+              <div className="inv-doc-type">SALES ORDER</div>
+              <div className="inv-meta-row"><span>Order No.</span><strong>{order.orderNumber || `#${order.id}`}</strong></div>
+              <div className="inv-meta-row"><span>Date</span><strong>{formatDate(order.orderDate || order.createdAt)}</strong></div>
+              <div className="inv-meta-row"><span>Status</span><strong>{order.status || "Pending"}</strong></div>
+            </div>
           </div>
-          <h3>Bill To</h3>
-          <div className="print-customer"><strong>{customer.businessName || customer.name || "—"}</strong>
-            <div>{customer.contactPerson || ""}</div><div>{customer.phone || ""}{customer.email ? ` · ${customer.email}` : ""}</div>
-            <div>{[customer.address, customer.city, customer.state, customer.pincode].filter(Boolean).join(", ")}</div>
+
+          <div className="inv-rule" />
+
+          {/* Bill To */}
+          <div className="inv-bill-section">
+            <div className="inv-section-label">BILL TO</div>
+            <div className="inv-cust-name">{customer.businessName || customer.name || "—"}</div>
+            {customer.contactPerson && <div>{customer.contactPerson}</div>}
+            {(customer.phone || customer.email) && (
+              <div>{customer.phone || ""}{customer.email ? ` · ${customer.email}` : ""}</div>
+            )}
+            {[customer.address, customer.city, customer.state, customer.pincode].filter(Boolean).length > 0 && (
+              <div>{[customer.address, customer.city, customer.state, customer.pincode].filter(Boolean).join(", ")}</div>
+            )}
             {customer.gstin && <div>GSTIN: {customer.gstin}</div>}
           </div>
-          <table className="print-items"><thead><tr><th>#</th><th>Product</th><th>Code</th><th>Qty</th><th>Unit price</th><th>Discount</th><th>GST</th><th>Total</th></tr></thead>
-            <tbody>{items.map((item, index) => { const q = Number(item.quantity || 0), p = Number(item.unitPrice ?? item.dealerPrice ?? 0), d = Number(item.discountPercent || 0), t = Number(item.taxPercent ?? 18), g = q * p, da = g * d / 100, taxableLine = g - da, ga = taxableLine * t / 100; return <tr key={`${item.productId || item.productCode || index} - ${index}`}><td>{index + 1}</td><td>{item.productName || item.name || "—"}</td><td>{item.productCode || "—"}</td><td>{q}</td><td>{money(p)}</td><td>{d}% ({money(da)})</td><td>{t}% ({money(ga)})</td><td>{money(item.lineTotal ?? taxableLine + ga)}</td></tr>; })}</tbody></table>
-          <div className="print-total-area"><div><span>Subtotal</span><b>{money(subtotal)}</b></div><div><span>Discount</span><b>{money(discount)}</b></div><div><span>Taxable value</span><b>{money(taxable)}</b></div><div><span>GST</span><b>{money(tax)}</b></div><div className="print-grand"><span>Grand total</span><b>{money(total)}</b></div></div>
-          {order.notes && <div className="print-notes"><strong>Notes:</strong> {order.notes}</div>}
-          <div className="print-signatures"><div>Customer Signature</div><div>For BHARAT BATTERIES<br /><br />Authorised Signatory</div></div>
-          <p className="print-footer">Computer-generated sales order.</p>
+
+          {/* Items table */}
+          <table className="inv-items">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Product</th>
+                <th>Code</th>
+                <th>Qty</th>
+                <th>Unit Price</th>
+                <th>Discount</th>
+                <th>GST</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, index) => {
+                const q = Number(item.quantity || 0);
+                const p = Number(item.unitPrice ?? item.dealerPrice ?? 0);
+                const d = Number(item.discountPercent || 0);
+                const t = Number(item.taxPercent ?? 18);
+                const gross = q * p;
+                const da = gross * d / 100;
+                const taxableLine = gross - da;
+                const ga = taxableLine * t / 100;
+                return (
+                  <tr key={`${item.productId || item.productCode || index}-${index}`}>
+                    <td>{index + 1}</td>
+                    <td>{item.productName || item.name || "—"}</td>
+                    <td>{item.productCode || "—"}</td>
+                    <td>{q}</td>
+                    <td>{money(p)}</td>
+                    <td>{d > 0 ? `${d}% (${money(da)})` : "—"}</td>
+                    <td>{t}% ({money(ga)})</td>
+                    <td><strong>{money(item.lineTotal ?? taxableLine + ga)}</strong></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Totals */}
+          <div className="inv-totals">
+            <div className="inv-total-row"><span>Subtotal</span><span>{money(subtotal)}</span></div>
+            <div className="inv-total-row"><span>Discount</span><span>− {money(discount)}</span></div>
+            <div className="inv-total-row"><span>Taxable Value</span><span>{money(taxable)}</span></div>
+            <div className="inv-total-row"><span>GST</span><span>{money(tax)}</span></div>
+            <div className="inv-total-row inv-grand"><span>Grand Total</span><span>{money(total)}</span></div>
+          </div>
+
+          {order.notes && (
+            <div className="inv-notes"><strong>Notes:</strong> {order.notes}</div>
+          )}
+
+          {/* Signatures */}
+          <div className="inv-signatures">
+            <div className="inv-sig-box">
+              <div className="inv-sig-line" />
+              <div>Customer Signature</div>
+            </div>
+            <div className="inv-sig-box">
+              <div className="inv-sig-line" />
+              <div>For BHARAT BATTERIES<br />Authorised Signatory</div>
+            </div>
+          </div>
+
+          <div className="inv-footer-text">Computer-generated sales order. No physical signature required.</div>
         </div>
 
 
@@ -485,13 +570,6 @@ function OrderDetailsModal({ order, onClose, onEdit }) {
 
 
 
-          <div className="sales-print-actions">
-            {order.status === "Draft" && (
-              <button type="button" className="sales-secondary" onClick={() => onEdit?.(order)}>Edit Draft</button>
-            )}
-            <button type="button" className="sales-secondary" onClick={() => window.print()}>Print Order</button>
-            <button type="button" className="sales-primary" onClick={() => window.print()}>Download PDF</button>
-          </div>
 
           <button
 
@@ -930,6 +1008,8 @@ export default function Sales({ activePage = "Sales" }) {
   const [saving, setSaving] = useState(false);
 
   const [viewOrder, setViewOrder] = useState(null);
+
+  const [autoPrint, setAutoPrint] = useState(false);
 
   const [editingOrder, setEditingOrder] = useState(null);
 
@@ -1598,19 +1678,35 @@ export default function Sales({ activePage = "Sales" }) {
 
                             <td>
 
-                              <button
+                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
 
-                                type="button"
+                                {record.status === "Draft" && (
+                                  <button
+                                    type="button"
+                                    className="sales-secondary"
+                                    onClick={() => openEditOrder(record)}
+                                  >
+                                    Edit
+                                  </button>
+                                )}
 
-                                className="sales-view-button"
+                                <button
+                                  type="button"
+                                  className="sales-secondary"
+                                  onClick={() => { setAutoPrint(true); setViewOrder(record); }}
+                                >
+                                  Print
+                                </button>
 
-                                onClick={() => setViewOrder(record)}
+                                <button
+                                  type="button"
+                                  className="sales-view-button"
+                                  onClick={() => { setAutoPrint(false); setViewOrder(record); }}
+                                >
+                                  Preview
+                                </button>
 
-                              >
-
-                                View details
-
-                              </button>
+                              </div>
 
                             </td>
 
@@ -2584,9 +2680,11 @@ export default function Sales({ activePage = "Sales" }) {
 
       order={viewOrder}
 
-      onClose={() => setViewOrder(null)}
+      onClose={() => { setViewOrder(null); setAutoPrint(false); }}
 
       onEdit={openEditOrder}
+
+      autoPrint={autoPrint}
 
     />
 

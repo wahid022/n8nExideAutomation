@@ -670,255 +670,248 @@
 
 
 /* =========================================================
-   SALES ORDER DETAILS - PRINT STYLE ISOLATION
+   PRINT DOCUMENT - HIDDEN ON SCREEN
    ========================================================= */
 
-/* Keep printable document completely hidden on screen */
 .sales-print-document {
     display: none !important;
 }
 
-/* Print action buttons */
-.sales-print-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 16px 0;
-}
-
-.sales-print-actions button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* Never print modal controls */
+/* =========================================================
+   PROFESSIONAL PRINT LAYOUT
+   ========================================================= */
 
 @media print {
     @page {
         size: A4 portrait;
-        margin: 10mm;
+        margin: 14mm 14mm 18mm 14mm;
     }
 
-    html,
-    body {
-        width: 100% !important;
-        height: auto !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        overflow: visible !important;
-        background: #fff !important;
-    }
-
-    /* Hide the application */
+    /* Hide everything on screen */
     body * {
         visibility: hidden !important;
     }
 
-    /* Render only the printable sales order */
+    /* Pull the print document to the very top of the page */
     .sales-print-document {
         display: block !important;
         visibility: visible !important;
-
-        position: static !important;
-        /* left: 0 !important; */
-        /* top: 0 !important; */
-
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
         width: 100% !important;
         height: auto !important;
-        max-height: none !important;
-
-        overflow: visible !important;
-        margin: 0 !important;
-        padding: 0 !important;
-
         background: #fff !important;
         color: #111827 !important;
-
-        /* z-index: 999999 !important; */
-    }
-
-    .sales-print-document * {
-        visibility: visible !important;
-    }
-
-    /* Remove modal layout restrictions */
-    .sales-modal-backdrop,
-    .sales-order-details-modal {
-        overflow: visible !important;
-        height: auto !important;
-        max-height: none !important;
-        transform: none !important;
-    }
-
-    /* Hide interactive controls */
-    .sales-print-actions,
-    .sales-details-footer,
-    .sales-close {
-        display: none !important;
-    }
-
-    .sales-print-document table {
-        width: 100% !important;
-        border-collapse: collapse !important;
-        page-break-inside: auto !important;
-    }
-
-    .sales-print-document tr {
-        page-break-inside: avoid !important;
-    }
-
-    .sales-print-document th,
-    .sales-print-document td {
-        border: 1px solid #d1d5db !important;
-        padding: 6px !important;
-    }
-
-    .sales-print-document h1 {
-        font-size: 22pt !important;
-        margin-bottom: 5mm !important;
-    }
-
-    .sales-print-document h3 {
-        margin: 4mm 0 2mm !important;
-    }
-}
-
-
-/* =====================================================
-   PROFESSIONAL SALES ORDER PRINT LAYOUT
-   ===================================================== */
-
-@media print {
-    @page {
-        size: A4 portrait;
-        margin: 12mm;
-    }
-
-    .sales-print-document {
-        position: static !important;
-        inset: auto !important;
-        transform: none !important;
-
-        width: 100% !important;
-        max-width: 100% !important;
-        height: auto !important;
-        max-height: none !important;
-
-        overflow: visible !important;
-        margin: 0 !important;
-        padding: 0 !important;
-
-        display: block !important;
-        background: #fff !important;
-        color: #172033 !important;
-
         font-family: Arial, Helvetica, sans-serif !important;
         font-size: 10pt !important;
         line-height: 1.5 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        z-index: 9999999 !important;
+        overflow: visible !important;
+        box-sizing: border-box !important;
     }
 
-    .sales-print-document h1 {
-        font-size: 25pt !important;
-        font-weight: 800 !important;
+    .sales-print-document * {
+        visibility: visible !important;
+        box-sizing: border-box !important;
+    }
+
+    /* ---- Header ---- */
+    .inv-header {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: flex-start !important;
+        margin-bottom: 7mm !important;
+    }
+
+    .inv-company-name {
+        font-size: 24pt !important;
+        font-weight: 900 !important;
+        color: #17365d !important;
         letter-spacing: 0.5px !important;
+        line-height: 1.1 !important;
+        margin-bottom: 4px !important;
+    }
+
+    .inv-company-sub {
+        font-size: 9pt !important;
+        color: #64748b !important;
+    }
+
+    .inv-doc-type {
+        font-size: 18pt !important;
+        font-weight: 800 !important;
         color: #17365d !important;
-        margin: 0 0 5px !important;
+        text-align: right !important;
+        margin-bottom: 8px !important;
+        letter-spacing: 1px !important;
     }
 
-    .sales-print-document h2 {
-        font-size: 15pt !important;
-        font-weight: 700 !important;
-        margin: 12px 0 8px !important;
+    .inv-meta {
+        text-align: right !important;
     }
 
-    .sales-print-document h3 {
-        font-size: 11pt !important;
+    .inv-meta-row {
+        display: flex !important;
+        justify-content: flex-end !important;
+        gap: 16px !important;
+        font-size: 9pt !important;
+        margin-bottom: 3px !important;
+    }
+
+    .inv-meta-row span {
+        color: #64748b !important;
+        min-width: 70px !important;
+        text-align: right !important;
+    }
+
+    .inv-meta-row strong {
         font-weight: 700 !important;
-        margin: 16px 0 8px !important;
+        color: #111827 !important;
+        min-width: 120px !important;
+        text-align: left !important;
+    }
+
+    /* ---- Divider ---- */
+    .inv-rule {
+        height: 2px !important;
+        background: #17365d !important;
+        margin: 5mm 0 !important;
+    }
+
+    /* ---- Bill To ---- */
+    .inv-bill-section {
+        margin-bottom: 7mm !important;
+        font-size: 9pt !important;
+        color: #374151 !important;
+        line-height: 1.6 !important;
+    }
+
+    .inv-section-label {
+        font-size: 7pt !important;
+        font-weight: 800 !important;
+        letter-spacing: 1.2px !important;
         color: #17365d !important;
+        margin-bottom: 5px !important;
     }
 
-    .sales-print-document table {
+    .inv-cust-name {
+        font-size: 12pt !important;
+        font-weight: 700 !important;
+        color: #111827 !important;
+        margin-bottom: 3px !important;
+    }
+
+    /* ---- Items Table ---- */
+    .inv-items {
         width: 100% !important;
         border-collapse: collapse !important;
-        margin: 12px 0 !important;
-        table-layout: auto !important;
+        margin-bottom: 5mm !important;
+        font-size: 9pt !important;
+        page-break-inside: auto !important;
     }
 
-    .sales-print-document thead {
+    .inv-items thead {
         display: table-header-group !important;
     }
 
-    .sales-print-document th {
+    .inv-items th {
         background: #17365d !important;
         color: #fff !important;
         font-weight: 700 !important;
-        text-transform: uppercase !important;
-        font-size: 8.5pt !important;
+        font-size: 7.5pt !important;
         letter-spacing: 0.3px !important;
-        padding: 9px 7px !important;
-        border: 1px solid #17365d !important;
+        padding: 8px 7px !important;
+        text-align: left !important;
+        border: 1px solid #0f2a4a !important;
     }
 
-    .sales-print-document td {
-        padding: 9px 7px !important;
-        border: 1px solid #d9e1ec !important;
-        font-size: 9pt !important;
+    .inv-items td {
+        padding: 7px !important;
+        border: 1px solid #d1d5db !important;
         vertical-align: middle !important;
-        color: #172033 !important;
+        color: #111827 !important;
+        font-size: 9pt !important;
     }
 
-    .sales-print-document tr:nth-child(even) td {
-        background: #f7f9fc !important;
+    .inv-items tbody tr:nth-child(even) td {
+        background: #f8fafc !important;
     }
 
-    .sales-print-document tr {
+    .inv-items tr {
         page-break-inside: avoid !important;
     }
 
-    .sales-print-document .print-totals {
-        width: 48% !important;
-        margin: 18px 0 0 auto !important;
-        border-top: 2px solid #17365d !important;
-        padding-top: 8px !important;
-    }
-
-    .sales-print-document .print-signatures {
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: flex-end !important;
-        margin-top: 60px !important;
-        page-break-inside: avoid !important;
-    }
-
-    .sales-print-document .print-signatures>div {
-        width: 40% !important;
-        border-top: 1px solid #7b8798 !important;
-        padding-top: 8px !important;
-        text-align: center !important;
-    }
-
-    .sales-print-document .print-order-meta {
-        display: flex !important;
-        justify-content: space-between !important;
-        gap: 15px !important;
-        padding: 12px !important;
-        margin: 15px 0 !important;
-        background: #f4f7fb !important;
-        border: 1px solid #d9e1ec !important;
-    }
-
-    .sales-print-document strong {
+    .inv-items td strong {
         font-weight: 700 !important;
     }
 
-    .sales-print-document p {
-        margin: 4px 0 !important;
+    /* ---- Totals ---- */
+    .inv-totals {
+        width: 46% !important;
+        margin-left: auto !important;
+        margin-bottom: 7mm !important;
+        border: 1px solid #d1d5db !important;
+        overflow: hidden !important;
     }
 
-    .sales-print-document,
-    .sales-print-document * {
-        box-sizing: border-box !important;
+    .inv-total-row {
+        display: flex !important;
+        justify-content: space-between !important;
+        padding: 5px 12px !important;
+        font-size: 9pt !important;
+        border-bottom: 1px solid #e5e7eb !important;
+        color: #374151 !important;
+    }
+
+    .inv-grand {
+        background: #17365d !important;
+        color: #fff !important;
+        font-weight: 800 !important;
+        font-size: 10.5pt !important;
+        border-bottom: none !important;
+        padding: 7px 12px !important;
+    }
+
+    /* ---- Notes ---- */
+    .inv-notes {
+        font-size: 9pt !important;
+        margin-bottom: 7mm !important;
+        padding: 7px 10px !important;
+        background: #f9fafb !important;
+        border-left: 3px solid #17365d !important;
+        color: #374151 !important;
+    }
+
+    /* ---- Signatures ---- */
+    .inv-signatures {
+        display: flex !important;
+        justify-content: space-between !important;
+        margin-top: 18mm !important;
+        page-break-inside: avoid !important;
+    }
+
+    .inv-sig-box {
+        width: 38% !important;
+        text-align: center !important;
+        font-size: 9pt !important;
+        color: #374151 !important;
+    }
+
+    .inv-sig-line {
+        border-top: 1px solid #374151 !important;
+        margin-bottom: 7px !important;
+    }
+
+    /* ---- Footer ---- */
+    .inv-footer-text {
+        margin-top: 8mm !important;
+        text-align: center !important;
+        font-size: 7.5pt !important;
+        color: #9ca3af !important;
+        border-top: 1px solid #e5e7eb !important;
+        padding-top: 4mm !important;
     }
 }
