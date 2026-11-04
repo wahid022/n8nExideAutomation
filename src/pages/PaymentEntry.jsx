@@ -139,7 +139,7 @@ export default function PaymentEntry({ activePage = "Payment Entry" }) {
         method: "POST",
         body: JSON.stringify({
           receiptNumber: form.receiptNumber,
-          customer: selectedCustomer,
+          customerId: selectedCustomer.id,
           invoiceId: form.invoiceId || null,
           paymentDate: form.date,
           amount: Number(form.amount),
@@ -230,7 +230,7 @@ export default function PaymentEntry({ activePage = "Payment Entry" }) {
                         <td>
                           <strong>{rec.receiptNumber || `#${rec.id}`}</strong>
                         </td>
-                        <td>{rec.customer?.businessName || "—"}</td>
+                        <td>{rec.businessName || rec.customer?.businessName || "—"}</td>
                         <td>{rec.invoiceNumber || "—"}</td>
                         <td>{formatDate(rec.paymentDate)}</td>
                         <td>{money(rec.amount)}</td>
