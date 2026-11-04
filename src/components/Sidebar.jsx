@@ -132,12 +132,7 @@ const NAV_GROUPS = [
     icon: "accounting",
     items: [
       { label: "Receipt Entry", icon: "receipt", path: "/sales" },
-      {
-        label: "Payment Entry",
-        icon: "payment",
-        path: "/sales/invoices",
-        state: { salesTab: "Payments" },
-      },
+      { label: "Payment Entry", icon: "payment" },
       { label: "Contra Entry", icon: "contra" },
       { label: "Journal Entry", icon: "journal" },
     ],

@@ -982,7 +982,15 @@ function OrderDetailsModal({ order, onClose, onEdit, autoPrint = false }) {
 export default function Sales({ activePage = "Sales" }) {
   const location = useLocation();
 
-  const [tab, setTab] = useState(location.state?.salesTab || "Orders");
+  const defaultTab =
+    activePage === "Sales Invoice" ? "Invoices" :
+    activePage === "Sales Order" ? "Orders" :
+    (location.state?.salesTab || "Orders");
+  const [tab, setTab] = useState(defaultTab);
+  useEffect(() => {
+    if (activePage === "Sales Invoice") setTab("Invoices");
+    else if (activePage === "Sales Order") setTab("Orders");
+  }, [activePage]);
   useEffect(() => { if (location.state?.salesTab) setTab(location.state.salesTab); }, [location.state?.salesTab]);
 
   const [summary, setSummary] = useState(null);
@@ -990,8 +998,6 @@ export default function Sales({ activePage = "Sales" }) {
   const [orders, setOrders] = useState([]);
 
   const [invoices, setInvoices] = useState([]);
-
-  const [payments, setPayments] = useState([]);
 
   const [customers, setCustomers] = useState([]);
 
@@ -1051,15 +1057,13 @@ export default function Sales({ activePage = "Sales" }) {
 
     try {
 
-      const [sum, ord, inv, pay, cust] = await Promise.all([
+      const [sum, ord, inv, cust] = await Promise.all([
 
         api("/sales/summary"),
 
         api(`/sales/orders?search=${encodeURIComponent(search)}`),
 
         api(`/sales/invoices?search=${encodeURIComponent(search)}`),
-
-        api("/sales/payments"),
 
         api("/customers"),
 
@@ -1072,8 +1076,6 @@ export default function Sales({ activePage = "Sales" }) {
       setOrders(ord.data || []);
 
       setInvoices(inv.data || []);
-
-      setPayments(pay.data || []);
 
       setCustomers(cust.data || []);
 
@@ -1196,9 +1198,7 @@ export default function Sales({ activePage = "Sales" }) {
 
     setForm({
 
-      documentNumber: `${tab === "Orders" ? "SO" : tab === "Invoices" ? "INV" : "RCPT"
-
-        }-${Date.now().toString().slice(-8)}`,
+      documentNumber: `${tab === "Orders" ? "SO" : "INV"}-${Date.now().toString().slice(-8)}`,
 
       customerId: customers[0] ? String(customers[0].id) : "",
 
@@ -1343,34 +1343,6 @@ export default function Sales({ activePage = "Sales" }) {
 
         }
 
-      } else {
-
-        result = await api("/sales/payments", {
-
-          method: "POST",
-
-          body: JSON.stringify({
-
-            receiptNumber: form.documentNumber,
-
-            customerId: Number(form.customerId),
-
-            invoiceId: form.invoiceId || null,
-
-            paymentDate: form.date,
-
-            amount: Number(form.amount),
-
-            paymentMethod: form.paymentMethod,
-
-            referenceNumber: form.referenceNumber,
-
-            notes: form.notes,
-
-          }),
-
-        });
-
       }
 
 
@@ -1404,22 +1376,12 @@ export default function Sales({ activePage = "Sales" }) {
     activePage === "Sales Order"
       ? ["Orders"]
       : activePage === "Sales Invoice"
-        ? ["Invoices", "Payments"]
-        : ["Orders", "Invoices", "Payments"];
+        ? ["Invoices"]
+        : ["Orders", "Invoices"];
 
 
 
-  const records =
-
-    tab === "Orders"
-
-      ? orders
-
-      : tab === "Invoices"
-
-        ? invoices
-
-        : payments;
+  const records = tab === "Orders" ? orders : invoices;
 
 
 
@@ -1429,9 +1391,7 @@ export default function Sales({ activePage = "Sales" }) {
 
       ? ["Order number", "Customer", "Date", "Status", "Total", "Actions"]
 
-      : tab === "Invoices"
-
-        ? [
+      : [
 
           "Invoice number",
 
@@ -1448,24 +1408,6 @@ export default function Sales({ activePage = "Sales" }) {
           "Paid",
 
           "Balance",
-
-        ]
-
-        : [
-
-          "Receipt",
-
-          "Customer",
-
-          "Invoice",
-
-          "Date",
-
-          "Method",
-
-          "Amount",
-
-          "Status",
 
         ];
 
@@ -1497,9 +1439,7 @@ export default function Sales({ activePage = "Sales" }) {
 
               <p>
 
-                Manage orders, invoices, customer payments and outstanding
-
-                balances.
+                Manage orders, invoices and outstanding balances.
 
               </p>
 
@@ -1509,17 +1449,7 @@ export default function Sales({ activePage = "Sales" }) {
 
             <button className="sales-primary" onClick={openCreate}>
 
-              ＋ New{" "}
-
-              {tab === "Orders"
-
-                ? "order"
-
-                : tab === "Invoices"
-
-                  ? "invoice"
-
-                  : "payment"}
+              ＋ New {tab === "Orders" ? "order" : "invoice"}
 
             </button>
 
@@ -1534,27 +1464,29 @@ export default function Sales({ activePage = "Sales" }) {
 
             <div className="sales-toolbar">
 
-              <div className="sales-tabs">
+              {tabs.length > 1 && (
+                <div className="sales-tabs">
 
-                {tabs.map((item) => (
+                  {tabs.map((item) => (
 
-                  <button
+                    <button
 
-                    key={item}
+                      key={item}
 
-                    className={tab === item ? "selected" : ""}
+                      className={tab === item ? "selected" : ""}
 
-                    onClick={() => setTab(item)}
+                      onClick={() => setTab(item)}
 
-                  >
+                    >
 
-                    {item}
+                      {item}
 
-                  </button>
+                    </button>
 
-                ))}
+                  ))}
 
-              </div>
+                </div>
+              )}
 
 
 
@@ -1794,59 +1726,7 @@ export default function Sales({ activePage = "Sales" }) {
 
 
 
-                      return (
-
-                        <tr key={record.id}>
-
-                          <td>
-
-                            <strong>{record.receiptNumber}</strong>
-
-                          </td>
-
-
-
-                          <td>
-
-                            {record.businessName ||
-
-                              customers.find(
-
-                                (c) =>
-
-                                  String(c.id) ===
-
-                                  String(record.customerId)
-
-                              )?.businessName ||
-
-                              `Customer #${record.customerId}`}
-
-                          </td>
-
-
-
-                          <td>{record.invoiceNumber || "Unallocated"}</td>
-
-
-
-                          <td>{formatDate(record.paymentDate)}</td>
-
-
-
-                          <td>{record.paymentMethod}</td>
-
-
-
-                          <td>{money(record.amount)}</td>
-
-
-
-                          <td>{record.status}</td>
-
-                        </tr>
-
-                      );
+                      return null;
 
                     })
 
@@ -1900,17 +1780,7 @@ export default function Sales({ activePage = "Sales" }) {
 
               <h2 id="sales-modal-title">
 
-                {editingOrder ? "Edit Draft Sales Order" : <>New{" "}
-
-                  {tab === "Orders"
-
-                    ? "sales order"
-
-                    : tab === "Invoices"
-
-                      ? "sales invoice"
-
-                      : "customer payment"}</>}
+                {editingOrder ? "Edit Draft Sales Order" : `New ${tab === "Orders" ? "sales order" : "sales invoice"}`}
 
               </h2>
 
@@ -2036,15 +1906,7 @@ export default function Sales({ activePage = "Sales" }) {
 
             <label>
 
-              {tab === "Invoices"
-
-                ? "Invoice date"
-
-                : tab === "Payments"
-
-                  ? "Payment date"
-
-                  : "Order date"}
+              {tab === "Invoices" ? "Invoice date" : "Order date"}
 
 
 
@@ -2096,173 +1958,7 @@ export default function Sales({ activePage = "Sales" }) {
 
 
 
-            {tab === "Payments" ? (
-
-              <>
-
-                <label>
-
-                  Invoice (optional)
-
-                  <select
-
-                    value={form.invoiceId}
-
-                    onChange={(e) =>
-
-                      setForm({ ...form, invoiceId: e.target.value })
-
-                    }
-
-                  >
-
-                    <option value="">Unallocated payment</option>
-
-
-
-                    {invoices
-
-                      .filter(
-
-                        (i) =>
-
-                          String(i.customer?.id) ===
-
-                          String(form.customerId) &&
-
-                          !["Paid", "Void"].includes(i.status)
-
-                      )
-
-                      .map((i) => (
-
-                        <option key={i.id} value={i.id}>
-
-                          {i.invoiceNumber} — balance{" "}
-
-                          {money(
-
-                            Number(i.grandTotal) -
-
-                            Number(i.amountPaid)
-
-                          )}
-
-                        </option>
-
-                      ))}
-
-                  </select>
-
-                </label>
-
-
-
-                <label>
-
-                  Amount (₹)
-
-                  <input
-
-                    type="number"
-
-                    min="0.01"
-
-                    step="0.01"
-
-                    required
-
-                    value={form.amount}
-
-                    onChange={(e) =>
-
-                      setForm({ ...form, amount: e.target.value })
-
-                    }
-
-                  />
-
-                </label>
-
-
-
-                <label>
-
-                  Payment method
-
-                  <select
-
-                    value={form.paymentMethod}
-
-                    onChange={(e) =>
-
-                      setForm({
-
-                        ...form,
-
-                        paymentMethod: e.target.value,
-
-                      })
-
-                    }
-
-                  >
-
-                    {[
-
-                      "Cash",
-
-                      "UPI",
-
-                      "Bank Transfer",
-
-                      "Cheque",
-
-                      "Card",
-
-                      "Other",
-
-                    ].map((m) => (
-
-                      <option key={m}>{m}</option>
-
-                    ))}
-
-                  </select>
-
-                </label>
-
-
-
-                <label>
-
-                  Reference number
-
-                  <input
-
-                    maxLength="120"
-
-                    value={form.referenceNumber}
-
-                    onChange={(e) =>
-
-                      setForm({
-
-                        ...form,
-
-                        referenceNumber: e.target.value,
-
-                      })
-
-                    }
-
-                  />
-
-                </label>
-
-              </>
-
-            ) : (
+            {(
 
               <div className="sales-line-items">
 
