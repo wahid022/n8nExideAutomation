@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { supabase } from "../lib/supabase";
@@ -142,10 +143,24 @@ function DebitNoteModal({ dn, onClose, autoPrint = false }) {
 }
 
 export default function PurchaseOperations({ activePage = "Debit Notes" }) {
-  const [vendors, setVendors] = useState([]);
-  const [rows, setRows] = useState([]);
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 200);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data: vendorsRaw } = useQuery({ queryKey: ["vendors"], queryFn: () => api("/vendors"), staleTime: 60_000 });
+  const { data: rowsRaw, isLoading: loading } = useQuery({
+    queryKey: ["purchase-debit-notes", debouncedSearch],
+    queryFn: () => api(`/purchase/debit-notes${debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : ""}`),
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+  });
+
+  const vendors = vendorsRaw?.data || [];
+  const rows    = rowsRaw?.data    || [];
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [modal, setModal] = useState(false);
@@ -155,20 +170,6 @@ export default function PurchaseOperations({ activePage = "Debit Notes" }) {
   const [viewDn, setViewDn] = useState(null);
   const [autoPrintDn, setAutoPrintDn] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try {
-      const [v, docs] = await Promise.all([
-        api("/vendors"),
-        api(`/purchase/debit-notes${search ? `?search=${encodeURIComponent(search)}` : ""}`),
-      ]);
-      setVendors(v.data || []);
-      setRows(docs.data || []);
-    } catch (e) { setError(e.message); }
-    finally { setLoading(false); }
-  }, [search]);
-
-  useEffect(() => { const t = setTimeout(load, 150); return () => clearTimeout(t); }, [load]);
 
   const open = () => {
     setEditingId(null); setError(""); setNotice("");
@@ -214,7 +215,7 @@ export default function PurchaseOperations({ activePage = "Debit Notes" }) {
       await api(path, { method: editingId ? "PUT" : "POST", body: JSON.stringify(payload) });
       setNotice(editingId ? "Debit Note updated." : "Debit Note saved.");
       setModal(false);
-      await load();
+      qc.invalidateQueries({ queryKey: ["purchase-debit-notes"] });
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   };
@@ -222,7 +223,7 @@ export default function PurchaseOperations({ activePage = "Debit Notes" }) {
   const updateStatus = async (row, status) => {
     try {
       await api(`/purchase/debit-notes/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
-      await load();
+      qc.invalidateQueries({ queryKey: ["purchase-debit-notes"] });
     } catch (e) { setError(e.message); }
   };
 

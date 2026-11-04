@@ -1,5 +1,6 @@
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { supabase } from "../lib/supabase";
@@ -56,11 +57,27 @@ async function api(path, options = {}) {
 }
 
 export default function PaymentEntry({ activePage = "Payment Entry" }) {
-  const [payments, setPayments] = useState([]);
-  const [invoices, setInvoices] = useState([]);
-  const [customers, setCustomers] = useState([]);
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 200);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data: paymentsRaw, isLoading: loading } = useQuery({
+    queryKey: ["sales-payments", debouncedSearch],
+    queryFn: () => api(`/sales/payments?search=${encodeURIComponent(debouncedSearch)}`),
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+  });
+  const { data: invoicesRaw } = useQuery({ queryKey: ["sales-invoices", ""], queryFn: () => api("/sales/invoices?search="), staleTime: 20_000 });
+  const { data: customersRaw } = useQuery({ queryKey: ["customers"], queryFn: () => api("/customers"), staleTime: 60_000 });
+
+  const payments  = paymentsRaw?.data  || [];
+  const invoices  = invoicesRaw?.data  || [];
+  const customers = customersRaw?.data || [];
+
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [modal, setModal] = useState(false);
@@ -76,30 +93,6 @@ export default function PaymentEntry({ activePage = "Payment Entry" }) {
     referenceNumber: "",
     notes: "",
   });
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const [pay, inv, cust] = await Promise.all([
-        api(`/sales/payments?search=${encodeURIComponent(search)}`),
-        api("/sales/invoices"),
-        api("/customers"),
-      ]);
-      setPayments(pay.data || []);
-      setInvoices(inv.data || []);
-      setCustomers(cust.data || []);
-    } catch (e) {
-      setError(e.message || "Unable to load payment records.");
-    } finally {
-      setLoading(false);
-    }
-  }, [search]);
-
-  useEffect(() => {
-    const timer = setTimeout(load, 200);
-    return () => clearTimeout(timer);
-  }, [load]);
 
   const customerInvoices = invoices.filter(
     (inv) => String(inv.customer?.id) === String(form.customerId)
@@ -151,7 +144,9 @@ export default function PaymentEntry({ activePage = "Payment Entry" }) {
 
       setNotice("Payment recorded successfully.");
       setModal(false);
-      await load();
+      qc.invalidateQueries({ queryKey: ["sales-payments"] });
+      qc.invalidateQueries({ queryKey: ["sales-invoices"] });
+      qc.invalidateQueries({ queryKey: ["sales-summary"] });
     } catch (e) {
       setError(e.message || "Unable to save payment.");
     } finally {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
@@ -120,29 +120,14 @@ function IconAlert() {
 
 export default function PurchaseDashboard({ activePage = "Purchase Dashboard" }) {
   const navigate = useNavigate();
-  const [summary, setSummary] = useState(null);
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const [sum, ord] = await Promise.all([
-        api("/purchase/summary"),
-        api("/purchase/orders?search="),
-      ]);
-      setSummary(sum);
-      setOrders(ord.data || []);
-    } catch (e) {
-      setError(e.message || "Unable to load purchase analytics.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data: summaryRaw, isLoading: sumLoading, error: sumErr } = useQuery({ queryKey: ["purchase-summary"], queryFn: () => api("/purchase/summary"), staleTime: 20_000 });
+  const { data: ordersRaw,  isLoading: ordLoading                 } = useQuery({ queryKey: ["purchase-orders", ""], queryFn: () => api("/purchase/orders?search="), staleTime: 20_000 });
 
-  useEffect(() => { load(); }, [load]);
+  const summary = summaryRaw      || null;
+  const orders  = ordersRaw?.data  || [];
+  const loading = sumLoading || ordLoading;
+  const error   = sumErr?.message  || "";
 
   const statusCounts = orders.reduce((acc, o) => {
     const s = o.status || "Unknown";

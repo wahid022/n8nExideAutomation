@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { supabase } from "../lib/supabase";
@@ -20,24 +21,28 @@ async function api(path, options = {}) {
 }
 
 export default function Customers({ activePage = "Customers" }) {
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data: customersRaw, isLoading: loading } = useQuery({
+    queryKey: ["customers", debouncedSearch],
+    queryFn: () => api(`/customers?search=${encodeURIComponent(debouncedSearch)}`),
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+  });
+  const customers = customersRaw?.data || [];
+
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY);
-
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try { const result = await api(`/customers?search=${encodeURIComponent(search)}`); setCustomers(result.data || []); }
-    catch (e) { setError(e.message || "Unable to load customers."); }
-    finally { setLoading(false); }
-  }, [search]);
-
-  useEffect(() => { const timer = setTimeout(load, 250); return () => clearTimeout(timer); }, [load]);
 
   const openAdd = () => { setEditingId(null); setForm(EMPTY); setError(""); setModalOpen(true); };
   const openEdit = (customer) => {
@@ -51,7 +56,7 @@ export default function Customers({ activePage = "Customers" }) {
       const result = await api(editingId ? `/customers/${encodeURIComponent(editingId)}` : "/customers", { method: editingId ? "PATCH" : "POST", body: JSON.stringify(form) });
       setNotice(editingId ? "Customer updated successfully." : "Customer created successfully.");
       setModalOpen(false); setForm(EMPTY); setEditingId(null);
-      await load();
+      qc.invalidateQueries({ queryKey: ["customers"] });
       if (!editingId && result.customer) setSearch(result.customer.businessName || result.customer.phone || "");
     } catch (e) { setError(e.message || "Unable to save customer."); }
     finally { setSaving(false); }

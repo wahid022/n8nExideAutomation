@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { supabase } from "../lib/supabase";
@@ -37,26 +38,28 @@ const vendorTypeBadge = (type) => {
 };
 
 export default function Vendors({ activePage = "Vendor List" }) {
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [vendors, setVendors] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data: vendorsRaw, isLoading: loading } = useQuery({
+    queryKey: ["vendors", debouncedSearch],
+    queryFn: () => api(`/vendors?search=${encodeURIComponent(debouncedSearch)}`),
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+  });
+  const vendors = vendorsRaw?.data || [];
+
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY);
-
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try {
-      const result = await api(`/vendors?search=${encodeURIComponent(search)}`);
-      setVendors(result.data || []);
-    } catch (e) { setError(e.message || "Unable to load vendors."); }
-    finally { setLoading(false); }
-  }, [search]);
-
-  useEffect(() => { const timer = setTimeout(load, 250); return () => clearTimeout(timer); }, [load]);
 
   const openAdd = () => { setEditingId(null); setForm(EMPTY); setError(""); setModalOpen(true); };
   const openEdit = (v) => {
@@ -74,7 +77,7 @@ export default function Vendors({ activePage = "Vendor List" }) {
       );
       setNotice(editingId ? "Vendor updated successfully." : "Vendor created successfully.");
       setModalOpen(false); setForm(EMPTY); setEditingId(null);
-      await load();
+      qc.invalidateQueries({ queryKey: ["vendors"] });
       if (!editingId && result.vendor) setSearch(result.vendor.businessName || result.vendor.phone || "");
     } catch (e) { setError(e.message || "Unable to save vendor."); }
     finally { setSaving(false); }

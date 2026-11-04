@@ -1,5 +1,6 @@
 
 import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { supabase } from "../lib/supabase";
@@ -74,9 +75,40 @@ export default function SalesOperations({ activePage }) {
 
   const [tab, setTab] = useState(initialTab);
 
-  const [customers, setCustomers] = useState([]);
-  const [rows, setRows] = useState([]);
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 200);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const TAB_PATHS = {
+    "Delivery Challans":  "/sales/challans",
+    "Credit Notes":       "/sales/credit-notes",
+    "Recurring Invoices": "/sales/recurring-invoices",
+  };
+  const TAB_KEYS = {
+    "Delivery Challans":  "sales-challans",
+    "Credit Notes":       "sales-credit-notes",
+    "Recurring Invoices": "sales-recurring-invoices",
+  };
+
+  const { data: customersRaw } = useQuery({ queryKey: ["customers"], queryFn: () => api("/customers"), staleTime: 60_000 });
+  const { data: rowsRaw, isLoading, error: rowsErr } = useQuery({
+    queryKey: [TAB_KEYS[tab] || tab, debouncedSearch],
+    queryFn: () => {
+      const path = TAB_PATHS[tab];
+      if (!path) return { data: [] };
+      return api(`${path}${debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : ""}`);
+    },
+    enabled: tab !== "Quotation Conversion",
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+  });
+
+  const customers = customersRaw?.data || [];
+  const rows      = rowsRaw?.data      || [];
 
   const [form, setForm] = useState({});
   const [modal, setModal] = useState(false);
@@ -96,46 +128,6 @@ export default function SalesOperations({ activePage }) {
     }
   }, [activePage, isStandalone]);
 
-  const load = useCallback(async () => {
-    setError("");
-
-    // Quotation Conversion does not need the document list.
-    if (tab === "Quotation Conversion") {
-      setRows([]);
-      return;
-    }
-
-    try {
-      const c = await api("/customers");
-      setCustomers(c.data || []);
-
-      const paths = {
-        "Delivery Challans": "/sales/challans",
-        "Credit Notes": "/sales/credit-notes",
-        "Recurring Invoices": "/sales/recurring-invoices",
-      };
-
-      const path = paths[tab];
-
-      if (!path) {
-        throw new Error(`Unsupported Sales Operations tab: ${tab}`);
-      }
-
-      const query = search
-        ? `?search=${encodeURIComponent(search)}`
-        : "";
-
-      const r = await api(`${path}${query}`);
-      setRows(r.data || []);
-    } catch (e) {
-      setError(e.message);
-    }
-  }, [tab, search]);
-
-  useEffect(() => {
-    const t = setTimeout(load, 150);
-    return () => clearTimeout(t);
-  }, [load]);
 
   const open = () => {
     setEditingId(null);
@@ -315,7 +307,7 @@ export default function SalesOperations({ activePage }) {
       );
 
       setModal(false);
-      await load();
+      qc.invalidateQueries({ queryKey: [TAB_KEYS[tab] || tab] });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -382,7 +374,7 @@ export default function SalesOperations({ activePage }) {
                         `Generated ${r.generated} recurring invoice(s).`
                       );
 
-                      await load();
+                      qc.invalidateQueries({ queryKey: [TAB_KEYS[tab] || tab] });
                     } catch (e) {
                       setError(e.message);
                     }
@@ -594,7 +586,7 @@ export default function SalesOperations({ activePage }) {
                                             }),
                                           }
                                         );
-                                        await load();
+                                        qc.invalidateQueries({ queryKey: [TAB_KEYS[tab] || tab] });
                                       } catch (e) {
                                         setError(e.message);
                                       }
@@ -625,7 +617,7 @@ export default function SalesOperations({ activePage }) {
                                             body: JSON.stringify({ status: "Issued" }),
                                           }
                                         );
-                                        await load();
+                                        qc.invalidateQueries({ queryKey: [TAB_KEYS[tab] || tab] });
                                       } catch (e) {
                                         setError(e.message);
                                       }
@@ -664,7 +656,7 @@ export default function SalesOperations({ activePage }) {
                                         }
                                       );
 
-                                      await load();
+                                      qc.invalidateQueries({ queryKey: [TAB_KEYS[tab] || tab] });
                                     } catch (e) {
                                       setError(e.message);
                                     }

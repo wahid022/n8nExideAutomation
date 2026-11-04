@@ -1,6 +1,7 @@
 
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 
 import Sidebar from "../components/Sidebar";
@@ -1215,19 +1216,25 @@ export default function Sales({ activePage = "Sales" }) {
   }, [activePage]);
   useEffect(() => { if (location.state?.salesTab) setTab(location.state.salesTab); }, [location.state?.salesTab]);
 
-  const [summary, setSummary] = useState(null);
-
-  const [orders, setOrders] = useState([]);
-
-  const [invoices, setInvoices] = useState([]);
-
-  const [customers, setCustomers] = useState([]);
-
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 200);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const [loading, setLoading] = useState(true);
+  const { data: ordersRaw,   isLoading: ordersLoading,   error: ordersErr   } = useQuery({ queryKey: ["sales-orders",   debouncedSearch], queryFn: () => api(`/sales/orders?search=${encodeURIComponent(debouncedSearch)}`),   staleTime: 20_000, placeholderData: keepPreviousData });
+  const { data: invoicesRaw, isLoading: invoicesLoading, error: invoicesErr } = useQuery({ queryKey: ["sales-invoices", debouncedSearch], queryFn: () => api(`/sales/invoices?search=${encodeURIComponent(debouncedSearch)}`), staleTime: 20_000, placeholderData: keepPreviousData });
+  const { data: customersRaw } = useQuery({ queryKey: ["customers"], queryFn: () => api("/customers"), staleTime: 60_000 });
+  const { data: summaryRaw,   isLoading: summaryLoading  } = useQuery({ queryKey: ["sales-summary"], queryFn: () => api("/sales/summary"), staleTime: 20_000 });
 
-  const [error, setError] = useState("");
+  const orders    = ordersRaw?.data    || [];
+  const invoices  = invoicesRaw?.data  || [];
+  const customers = customersRaw?.data || [];
+  const summary   = summaryRaw         || null;
+  const loading   = ordersLoading || invoicesLoading || summaryLoading;
+  const error     = (ordersErr || invoicesErr)?.message || "";
 
   const [notice, setNotice] = useState("");
 
@@ -1274,59 +1281,6 @@ export default function Sales({ activePage = "Sales" }) {
 
 
 
-  const load = useCallback(async () => {
-
-    setLoading(true);
-
-    setError("");
-
-
-
-    try {
-
-      const [sum, ord, inv, cust] = await Promise.all([
-
-        api("/sales/summary"),
-
-        api(`/sales/orders?search=${encodeURIComponent(search)}`),
-
-        api(`/sales/invoices?search=${encodeURIComponent(search)}`),
-
-        api("/customers"),
-
-      ]);
-
-
-
-      setSummary(sum);
-
-      setOrders(ord.data || []);
-
-      setInvoices(inv.data || []);
-
-      setCustomers(cust.data || []);
-
-    } catch (e) {
-
-      setError(e.message || "Unable to load Sales.");
-
-    } finally {
-
-      setLoading(false);
-
-    }
-
-  }, [search]);
-
-
-
-  useEffect(() => {
-
-    const timer = setTimeout(load, 200);
-
-    return () => clearTimeout(timer);
-
-  }, [load]);
 
 
 
@@ -1618,7 +1572,9 @@ export default function Sales({ activePage = "Sales" }) {
       setEditingInvoice(null);
       setModal(false);
 
-      await load();
+      qc.invalidateQueries({ queryKey: ["sales-orders"] });
+      qc.invalidateQueries({ queryKey: ["sales-invoices"] });
+      qc.invalidateQueries({ queryKey: ["sales-summary"] });
 
     } catch (e) {
 

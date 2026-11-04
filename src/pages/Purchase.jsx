@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { supabase } from "../lib/supabase";
@@ -303,10 +304,14 @@ function PurchaseDocModal({ doc, isInvoice, onClose, autoPrint = false }) {
 export default function Purchase({ activePage }) {
   const isInvoice = activePage === "Purchase Invoice";
 
-  const [vendors, setVendors] = useState([]);
-  const [rows, setRows] = useState([]);
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 200);
+    return () => clearTimeout(t);
+  }, [search]);
+
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [modal, setModal] = useState(false);
@@ -317,24 +322,21 @@ export default function Purchase({ activePage }) {
   const [autoPrintDoc, setAutoPrintDoc] = useState(false);
 
   const docPrefix = isInvoice ? "PINV" : "PO";
-  const apiPath = isInvoice ? "/purchase/invoices" : "/purchase/orders";
+  const apiPath   = isInvoice ? "/purchase/invoices" : "/purchase/orders";
+  const qKey      = isInvoice ? "purchase-invoices"  : "purchase-orders";
   const docNumKey = isInvoice ? "invoiceNumber" : "orderNumber";
-  const docDateKey = isInvoice ? "invoiceDate" : "orderDate";
+  const docDateKey = isInvoice ? "invoiceDate"  : "orderDate";
 
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try {
-      const [v, docs] = await Promise.all([
-        api("/vendors"),
-        api(`${apiPath}${search ? `?search=${encodeURIComponent(search)}` : ""}`),
-      ]);
-      setVendors(v.data || []);
-      setRows(docs.data || []);
-    } catch (e) { setError(e.message); }
-    finally { setLoading(false); }
-  }, [apiPath, search]);
+  const { data: vendorsRaw } = useQuery({ queryKey: ["vendors"], queryFn: () => api("/vendors"), staleTime: 60_000 });
+  const { data: rowsRaw, isLoading: loading } = useQuery({
+    queryKey: [qKey, debouncedSearch],
+    queryFn: () => api(`${apiPath}${debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : ""}`),
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+  });
 
-  useEffect(() => { const t = setTimeout(load, 150); return () => clearTimeout(t); }, [load]);
+  const vendors = vendorsRaw?.data || [];
+  const rows    = rowsRaw?.data    || [];
 
   const open = () => {
     setEditingId(null); setError(""); setNotice("");
@@ -384,7 +386,8 @@ export default function Purchase({ activePage }) {
       await api(path, { method: editingId ? "PUT" : "POST", body: JSON.stringify(payload) });
       setNotice(editingId ? `${activePage} updated.` : `${activePage} saved.`);
       setModal(false);
-      await load();
+      qc.invalidateQueries({ queryKey: [qKey] });
+      qc.invalidateQueries({ queryKey: ["purchase-summary"] });
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   };
