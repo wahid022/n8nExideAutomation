@@ -6,6 +6,9 @@ import useProductSorting from "../hooks/useProductSorting";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import PriceLookup from "../components/PriceLookup";
+import exideBatteryImg from "../assets/brands/exideBattery.jpg";
+import luminousBatteryImg from "../assets/brands/luminousBattery.jpg";
+import microtekBatteryImg from "../assets/brands/microtekBattery.png";
 
 const DEFAULT_BRAND = "All Brands";
 const DEFAULT_CATEGORY = "All Categories";
@@ -42,6 +45,13 @@ function catBadgeClass(category) {
   if (c.includes("tubular")) return "cat-badge--tub";
   if (c.includes("smf")) return "cat-badge--smf";
   return "cat-badge--other";
+}
+
+function brandImage(brand) {
+  const b = String(brand || "").toLowerCase();
+  if (b.includes("luminous")) return luminousBatteryImg;
+  if (b.includes("microtek")) return microtekBatteryImg;
+  return exideBatteryImg;
 }
 
 function Icon({ size = 18, children }) {
@@ -313,6 +323,7 @@ export default function Dashboard({ activePage = "Dashboard", onNavigate = () =>
                       const productName = getField(product, "product_name", "Model / SKU");
                       const productBrand = getField(product, "brand", "Brand");
                       const productCategory = getField(product, "category", "Category");
+                      const productSku = getField(product, "sku", "SKU");
                       const mrp = formatINR(getField(product, "mrp", "MRP"));
                       const dealer = formatINR(getField(product, "dealer_price", "Dealer Price"));
                       const isEditing = editingProductId === productId;
@@ -321,8 +332,17 @@ export default function Dashboard({ activePage = "Dashboard", onNavigate = () =>
                         <Fragment key={productId || index}>
                           <tr className={`db-row${isEditing ? " db-row--open" : ""}`}>
                             <td>
-                              <span className="db-prod-name">{productName || "—"}</span>
-                              {productId && <span className="db-prod-code">{productId}</span>}
+                              <div className="db-prod-cell">
+                                <img className="db-prod-img" src={brandImage(productBrand)} alt="" />
+                                <div>
+                                  <span className="db-prod-name">{productName || "—"}</span>
+                                  <span className="db-prod-meta">
+                                    {productId && <>Code: {productId}</>}
+                                    {productId && productSku && <span className="db-prod-sep">|</span>}
+                                    {productSku && <>SKU: {productSku}</>}
+                                  </span>
+                                </div>
+                              </div>
                             </td>
                             <td className="db-brand">{productBrand || "—"}</td>
                             <td>
@@ -346,7 +366,17 @@ export default function Dashboard({ activePage = "Dashboard", onNavigate = () =>
                                 aria-expanded={isEditing}
                                 onClick={() => setEditingProductId(isEditing ? "" : productId)}
                               >
-                                {isEditing ? "✓ Done" : "Edit Price"}
+                                {isEditing ? (
+                                  <>
+                                    <svg viewBox="0 0 14 14" fill="none" width="12" height="12" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12l2-2 6-6-2-2-6 6-2 2 2 2z" stroke="currentColor"/><path d="M9 3l2 2" stroke="currentColor"/></svg>
+                                    Done
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg viewBox="0 0 14 14" fill="none" width="12" height="12" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2.5l2 2-6 6H3.5v-2l6-6z" stroke="currentColor"/><path d="M8 4l2 2" stroke="currentColor"/></svg>
+                                    Edit Price
+                                  </>
+                                )}
                               </button>
                             </td>
                           </tr>
