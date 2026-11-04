@@ -1,25 +1,49 @@
 :root {
+  /* Brand */
+  --primary: #4F46E5;
+  --primary-dark: #4338CA;
+  --primary-light: #EEF2FF;
+  --primary-mid: #E0E7FF;
+  --primary-glow: rgba(79, 70, 229, 0.18);
 
-  --navy: #101a2b;
+  /* Alias for existing code that uses --blue */
+  --blue: #4F46E5;
+  --blue-hover: #4338CA;
+  --blue-soft: #EEF2FF;
 
-  --navy-light: #1b2b43;
+  /* Sidebar */
+  --navy: #0F172A;
+  --navy-light: #1E293B;
 
-  --blue: #2563eb;
+  /* Text */
+  --text: #0F172A;
+  --text-muted: #64748B;
 
-  --blue-hover: #1d4ed8;
+  /* Surfaces */
+  --border: #E2E8F0;
+  --surface: #FFFFFF;
+  --page: #F8FAFC;
 
-  --blue-soft: #eff6ff;
+  /* Semantic */
+  --success: #059669;
+  --success-bg: #ECFDF5;
+  --success-border: #A7F3D0;
+  --warning: #D97706;
+  --warning-bg: #FFFBEB;
+  --warning-border: #FDE68A;
+  --danger: #DC2626;
+  --danger-bg: #FEF2F2;
+  --danger-border: #FECACA;
 
-  --text: #172033;
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 40px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.05);
 
-  --text-muted: #718096;
-
-  --border: #e2e8f0;
-
-  --surface: #ffffff;
-
-  --page: #f4f7fb;
-
+  /* Motion */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur: 150ms;
 }
 
 * {
@@ -29,15 +53,12 @@
 }
 
 body {
-
   margin: 0;
-
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-
   color: var(--text);
-
   background: var(--page);
-
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
@@ -136,13 +157,15 @@ button {
 
   border-radius: 12px;
 
-  background: linear-gradient(135deg, #1677ff, #59a5ff);
+  background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
 
   color: white;
 
   font-size: 23px;
 
   font-weight: 800;
+
+  box-shadow: 0 4px 12px rgba(79,70,229,0.4);
 
 }
 
@@ -224,11 +247,11 @@ button {
 
 .nav-item.active {
 
-  background: #194b91;
+  background: var(--primary);
 
   color: #ffffff;
 
-  box-shadow: inset 3px 0 #69aaff;
+  box-shadow: inset 3px 0 #a5b4fc;
 
 }
 
@@ -256,11 +279,11 @@ button {
 
   padding: 15px 12px;
 
-  border: 1px solid #34455e;
+  border: 1px solid rgba(99,102,241,0.2);
 
   border-radius: 12px;
 
-  background: #172438;
+  background: rgba(79,70,229,0.08);
 
 }
 
@@ -300,7 +323,7 @@ button {
 
   gap: 6px;
 
-  color: #f5d79a;
+  color: #a5b4fc;
 
   font-size: 10px;
 
@@ -3326,7 +3349,7 @@ button {
 }
 .db-act:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.14); }
 .db-act:active { transform: none; box-shadow: none; }
-.db-act--blue   { background: #2563eb; color: #fff; }
+.db-act--blue   { background: var(--primary); color: #fff; }
 .db-act--indigo { background: #4f46e5; color: #fff; }
 .db-act--teal   { background: #0d9488; color: #fff; }
 .db-act--violet { background: #7c3aed; color: #fff; }
@@ -3357,7 +3380,7 @@ button {
   height: 3px;
   border-radius: 14px 14px 0 0;
 }
-.db-stat--blue::before   { background: #3b82f6; }
+.db-stat--blue::before   { background: var(--primary); }
 .db-stat--rose::before   { background: #f43f5e; }
 .db-stat--violet::before { background: #8b5cf6; }
 .db-stat--amber::before  { background: #f59e0b; }
@@ -3669,4 +3692,32 @@ button {
   .db-stats { grid-template-columns: 1fr 1fr; gap: 10px; }
   .db-pager { flex-direction: column; align-items: flex-start; }
   .db-title { font-size: 20px; }
+}
+
+/* ════════════════════════════════════════════════════
+   Global micro-interaction & polish layer
+   ════════════════════════════════════════════════════ */
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--primary-glow) !important;
+}
+
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-xs);
 }

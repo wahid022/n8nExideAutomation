@@ -38,7 +38,7 @@ const STATUS_COLOR = {
   Paid: "#0ea5e9",
 };
 
-function DonutChart({ segments, size = 140, thickness = 24 }) {
+function DonutChart({ segments, size = 160, thickness = 26 }) {
   const r = (size / 2) - (thickness / 2);
   const C = 2 * Math.PI * r;
   const cx = size / 2;
@@ -48,8 +48,8 @@ function DonutChart({ segments, size = 140, thickness = 24 }) {
   if (!total) {
     return (
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e2e8f0" strokeWidth={thickness} />
-        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize="13" fill="#9ca3af">No data</text>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#E2E8F0" strokeWidth={thickness} />
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize="13" fill="#94A3B8">No data</text>
       </svg>
     );
   }
@@ -57,7 +57,7 @@ function DonutChart({ segments, size = 140, thickness = 24 }) {
   let cumPct = 0;
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f1f5f9" strokeWidth={thickness} />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#F1F5F9" strokeWidth={thickness} />
       {segments.map((seg, i) => {
         const pct = seg.value / total;
         const dash = pct * C;
@@ -69,22 +69,22 @@ function DonutChart({ segments, size = 140, thickness = 24 }) {
             cx={cx} cy={cy} r={r}
             fill="none"
             stroke={seg.color}
-            strokeWidth={thickness - 2}
+            strokeWidth={thickness - 3}
             strokeDasharray={`${dash} ${C - dash}`}
             strokeDashoffset={dashOffset}
             style={{ transform: `rotate(-90deg)`, transformOrigin: `${cx}px ${cy}px` }}
           />
         );
       })}
-      <text x={cx} y={cy - 6} textAnchor="middle" fontSize="22" fontWeight="800" fill="#17294a">{total}</text>
-      <text x={cx} y={cy + 12} textAnchor="middle" fontSize="9" fill="#72809a" letterSpacing="0.5">ORDERS</text>
+      <text x={cx} y={cy - 7} textAnchor="middle" fontSize="24" fontWeight="800" fill="#0F172A">{total}</text>
+      <text x={cx} y={cy + 12} textAnchor="middle" fontSize="10" fill="#64748B" letterSpacing="0.5">ORDERS</text>
     </svg>
   );
 }
 
 function IconOrders() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24">
       <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
       <line x1="3" y1="6" x2="21" y2="6" />
       <path d="M16 10a4 4 0 01-8 0" />
@@ -93,7 +93,7 @@ function IconOrders() {
 }
 function IconInvoice() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24">
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
       <polyline points="14 2 14 8 20 8" />
       <line x1="16" y1="13" x2="8" y2="13" />
@@ -103,7 +103,7 @@ function IconInvoice() {
 }
 function IconPayment() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24">
       <rect x="2" y="5" width="20" height="14" rx="2" />
       <line x1="2" y1="10" x2="22" y2="10" />
     </svg>
@@ -111,7 +111,7 @@ function IconPayment() {
 }
 function IconAlert() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24">
       <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
       <line x1="12" y1="9" x2="12" y2="13" />
       <line x1="12" y1="17" x2="12.01" y2="17" />
@@ -145,14 +145,12 @@ export default function SalesDashboard({ activePage = "Sales Dashboard" }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // Status breakdown counts
   const statusCounts = orders.reduce((acc, o) => {
     const s = o.status || "Unknown";
     acc[s] = (acc[s] || 0) + 1;
     return acc;
   }, {});
 
-  // Status breakdown by value
   const statusValues = orders.reduce((acc, o) => {
     const s = o.status || "Unknown";
     acc[s] = (acc[s] || 0) + Number(o.grandTotal || 0);
@@ -205,36 +203,39 @@ export default function SalesDashboard({ activePage = "Sales Dashboard" }) {
           {/* KPI Cards */}
           <div className="sd-kpi-row">
             <div className="sd-kpi sd-kpi--blue">
-              <div className="sd-kpi-icon"><IconOrders /></div>
-              <div className="sd-kpi-body">
-                <span>Sales Orders</span>
-                <strong>{loading ? "—" : (summary?.orders?.count ?? "0")}</strong>
-                <small>{money(summary?.orders?.value)} total value</small>
+              <div className="sd-kpi-top">
+                <span className="sd-kpi-label">Sales Orders</span>
+                <div className="sd-kpi-icon"><IconOrders /></div>
               </div>
+              <strong className="sd-kpi-value">{loading ? "—" : (summary?.orders?.count ?? "0")}</strong>
+              <small className="sd-kpi-sub">{money(summary?.orders?.value)} total value</small>
             </div>
+
             <div className="sd-kpi sd-kpi--green">
-              <div className="sd-kpi-icon"><IconInvoice /></div>
-              <div className="sd-kpi-body">
-                <span>Invoices</span>
-                <strong>{loading ? "—" : (summary?.invoices?.count ?? "0")}</strong>
-                <small>{money(invoiceValue)} invoice value</small>
+              <div className="sd-kpi-top">
+                <span className="sd-kpi-label">Invoices</span>
+                <div className="sd-kpi-icon"><IconInvoice /></div>
               </div>
+              <strong className="sd-kpi-value">{loading ? "—" : (summary?.invoices?.count ?? "0")}</strong>
+              <small className="sd-kpi-sub">{money(invoiceValue)} invoice value</small>
             </div>
+
             <div className="sd-kpi sd-kpi--indigo">
-              <div className="sd-kpi-icon"><IconPayment /></div>
-              <div className="sd-kpi-body">
-                <span>Payments Received</span>
-                <strong>{loading ? "—" : money(received)}</strong>
-                <small>Recorded receipts</small>
+              <div className="sd-kpi-top">
+                <span className="sd-kpi-label">Payments Received</span>
+                <div className="sd-kpi-icon"><IconPayment /></div>
               </div>
+              <strong className="sd-kpi-value">{loading ? "—" : money(received)}</strong>
+              <small className="sd-kpi-sub">Recorded receipts</small>
             </div>
-            <div className="sd-kpi sd-kpi--amber">
-              <div className="sd-kpi-icon"><IconAlert /></div>
-              <div className="sd-kpi-body">
-                <span>Outstanding</span>
-                <strong>{loading ? "—" : money(outstanding)}</strong>
-                <small>Unpaid invoice balance</small>
+
+            <div className="sd-kpi sd-kpi--red">
+              <div className="sd-kpi-top">
+                <span className="sd-kpi-label">Outstanding</span>
+                <div className="sd-kpi-icon"><IconAlert /></div>
               </div>
+              <strong className="sd-kpi-value">{loading ? "—" : money(outstanding)}</strong>
+              <small className="sd-kpi-sub">Unpaid invoice balance</small>
             </div>
           </div>
 
@@ -281,7 +282,7 @@ export default function SalesDashboard({ activePage = "Sales Dashboard" }) {
                     <span>Collected</span>
                     <strong>{money(received)}</strong>
                   </div>
-                  <div className="sd-gauge-pill sd-gauge-pill--amber">
+                  <div className="sd-gauge-pill sd-gauge-pill--red">
                     <span>Outstanding</span>
                     <strong>{money(outstanding)}</strong>
                   </div>
@@ -293,33 +294,41 @@ export default function SalesDashboard({ activePage = "Sales Dashboard" }) {
             <div className="sd-card">
               <div className="sd-card-header"><h2>Quick Actions</h2></div>
               <div className="sd-action-grid">
-                <button className="sd-action-btn" onClick={() => navigate("/sales/orders")}>
-                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
+                <button className="sd-action-btn sd-action-btn--order" onClick={() => navigate("/sales/orders")}>
+                  <div className="sd-btn-icon">
+                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                  </div>
                   New Order
                 </button>
-                <button className="sd-action-btn" onClick={() => navigate("/sales/invoices")}>
-                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
+                <button className="sd-action-btn sd-action-btn--invoice" onClick={() => navigate("/sales/invoices")}>
+                  <div className="sd-btn-icon">
+                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                  </div>
                   New Invoice
                 </button>
-                <button className="sd-action-btn" onClick={() => navigate("/sales-operations/delivery-challans")}>
-                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="1" y="3" width="15" height="13" />
-                    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-                    <circle cx="5.5" cy="18.5" r="2.5" />
-                    <circle cx="18.5" cy="18.5" r="2.5" />
-                  </svg>
+                <button className="sd-action-btn sd-action-btn--challan" onClick={() => navigate("/sales-operations/delivery-challans")}>
+                  <div className="sd-btn-icon">
+                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="1" y="3" width="15" height="13" />
+                      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                      <circle cx="5.5" cy="18.5" r="2.5" />
+                      <circle cx="18.5" cy="18.5" r="2.5" />
+                    </svg>
+                  </div>
                   Challan
                 </button>
-                <button className="sd-action-btn" onClick={() => navigate("/sales-operations/credit-notes")}>
-                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="1" x2="12" y2="23" />
-                    <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
-                  </svg>
+                <button className="sd-action-btn sd-action-btn--credit" onClick={() => navigate("/sales-operations/credit-notes")}>
+                  <div className="sd-btn-icon">
+                    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="1" x2="12" y2="23" />
+                      <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+                    </svg>
+                  </div>
                   Credit Note
                 </button>
               </div>

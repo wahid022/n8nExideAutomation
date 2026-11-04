@@ -255,10 +255,10 @@ export default function Sidebar({ activePage }) {
 
         <div>
           <strong>Master Database</strong>
-          <p>Excel workbook</p>
+          <p>Postgres</p>
           <span className="status-pill">
             <span className="status-dot" />
-            Excel data source
+            Postgres data source
           </span>
         </div>
       </div>

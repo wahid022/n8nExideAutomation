@@ -1734,15 +1734,15 @@ export default function Sales({ activePage = "Sales" }) {
                 <span>Order Value</span>
                 <strong>{money(orders.reduce((s, r) => s + Number(r.grandTotal || 0), 0))}</strong>
               </div>
-              <div className="si-stat si-stat--paid">
+              <div className={`si-stat si-stat--paid${orders.filter(r => r.status === "Confirmed").length === 0 ? " si-stat--zero" : ""}`}>
                 <span>Confirmed</span>
                 <strong>{orders.filter(r => r.status === "Confirmed").length}</strong>
               </div>
-              <div className="si-stat">
+              <div className="si-stat si-stat--draft">
                 <span>Draft</span>
                 <strong>{orders.filter(r => r.status === "Draft").length}</strong>
               </div>
-              <div className="si-stat si-stat--overdue">
+              <div className={`si-stat si-stat--overdue${orders.filter(r => r.status === "Cancelled").length === 0 ? " si-stat--zero" : ""}`}>
                 <span>Cancelled</span>
                 <strong>{orders.filter(r => r.status === "Cancelled").length}</strong>
               </div>
@@ -1767,10 +1767,12 @@ export default function Sales({ activePage = "Sales" }) {
                 <span>Collected</span>
                 <strong>{money(invoices.reduce((s, r) => s + Number(r.amountPaid || 0), 0))}</strong>
               </div>
-              <div className="si-stat si-stat--overdue">
+              {(() => { const overdueCount = invoices.filter(r => r.dueDate && new Date(r.dueDate) < new Date() && !["Paid", "Void", "Cancelled"].includes(r.status)).length; return (
+              <div className={`si-stat si-stat--overdue${overdueCount === 0 ? " si-stat--zero" : ""}`}>
                 <span>Overdue</span>
-                <strong>{invoices.filter(r => r.dueDate && new Date(r.dueDate) < new Date() && !["Paid", "Void", "Cancelled"].includes(r.status)).length}</strong>
+                <strong>{overdueCount}</strong>
               </div>
+              ); })()}
             </div>
           )}
 

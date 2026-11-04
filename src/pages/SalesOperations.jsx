@@ -468,8 +468,9 @@ export default function SalesOperations({ activePage }) {
                     <thead>
                       <tr>
                         <th>Document</th>
+                        <th>Customer</th>
                         <th>{tab === "Recurring Invoices" ? "Next run" : "Date"}</th>
-                        <th>Items</th>
+                        <th>{tab === "Credit Notes" ? "Amount" : "Items"}</th>
                         <th>Status</th>
                         <th>Action</th>
                       </tr>
@@ -478,7 +479,7 @@ export default function SalesOperations({ activePage }) {
                     <tbody>
                       {rows.length === 0 ? (
                         <tr>
-                          <td colSpan="5" className="sales-empty">
+                          <td colSpan="6" className="sales-empty">
                             No records found.
                           </td>
                         </tr>
@@ -516,14 +517,25 @@ export default function SalesOperations({ activePage }) {
                               : `${truncated} +${r.items.length - 1} more · Qty ${totalQty}`;
                           })();
 
+                          const customerName = r.customer?.businessName || `Customer #${r.customerId || "—"}`;
+                          const SO_AVATAR_COLORS = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899"];
+                          const soAvatarColor = SO_AVATAR_COLORS[customerName.charCodeAt(0) % SO_AVATAR_COLORS.length];
+
                           return (
-                          <tr key={r.id}>
-                            {/* Document + Customer stacked */}
+                          <tr key={r.id} className="si-row">
+                            {/* Document number */}
                             <td>
-                              <strong style={{ display: "block", color: "#172b4d" }}>{r[titleKey]}</strong>
-                              <span style={{ fontSize: "0.82em", color: "#64748b" }}>
-                                {r.customer?.businessName || `Customer #${r.customerId || "—"}`}
-                              </span>
+                              <div className="si-inv-num">
+                                <svg className="si-inv-icon" viewBox="0 0 16 16" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="1.5" width="10" height="13" rx="1.5" stroke="currentColor"/><line x1="5" y1="5" x2="10.5" y2="5" stroke="currentColor" strokeWidth="1"/><line x1="5" y1="7.5" x2="10.5" y2="7.5" stroke="currentColor" strokeWidth="1"/><line x1="5" y1="10" x2="8" y2="10" stroke="currentColor" strokeWidth="1"/></svg>
+                                <strong>{r[titleKey]}</strong>
+                              </div>
+                            </td>
+                            {/* Customer with avatar */}
+                            <td>
+                              <div className="si-customer">
+                                <span className="si-avatar" style={{ background: soAvatarColor }}>{customerName.charAt(0).toUpperCase()}</span>
+                                <span className="si-customer-name">{customerName}</span>
+                              </div>
                             </td>
 
                             <td style={{ whiteSpace: "nowrap" }}>{formattedDate}</td>
@@ -554,13 +566,11 @@ export default function SalesOperations({ activePage }) {
                             </td>
 
                             <td>
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              <div className="si-action-group">
                               {tab === "Delivery Challans" &&
                                 r.status === "Draft" && (
-                                  <button
-                                    className="sales-secondary"
-                                    onClick={() => openEdit(r)}
-                                  >
+                                  <button className="si-action-btn si-action-btn--edit" onClick={() => openEdit(r)}>
+                                    <svg viewBox="0 0 14 14" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2.5l2 2-6 6H3.5v-2l6-6z"/><path d="M8 4l2 2"/></svg>
                                     Edit
                                   </button>
                                 )}
@@ -569,7 +579,7 @@ export default function SalesOperations({ activePage }) {
                                 r.status !== "Delivered" &&
                                 r.status !== "Cancelled" && (
                                   <button
-                                    className="sales-secondary"
+                                    className="si-action-btn si-action-btn--preview"
                                     onClick={async () => {
                                       try {
                                         await api(
@@ -584,25 +594,20 @@ export default function SalesOperations({ activePage }) {
                                             }),
                                           }
                                         );
-
                                         await load();
                                       } catch (e) {
                                         setError(e.message);
                                       }
                                     }}
                                   >
-                                    {r.status === "Draft"
-                                      ? "Dispatch"
-                                      : "Mark delivered"}
+                                    {r.status === "Draft" ? "Dispatch" : "Mark delivered"}
                                   </button>
                                 )}
 
                               {tab === "Credit Notes" &&
                                 !["Void"].includes(r.status) && (
-                                  <button
-                                    className="sales-secondary"
-                                    onClick={() => openEditCreditNote(r)}
-                                  >
+                                  <button className="si-action-btn si-action-btn--edit" onClick={() => openEditCreditNote(r)}>
+                                    <svg viewBox="0 0 14 14" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2.5l2 2-6 6H3.5v-2l6-6z"/><path d="M8 4l2 2"/></svg>
                                     Edit
                                   </button>
                                 )}
@@ -610,19 +615,16 @@ export default function SalesOperations({ activePage }) {
                               {tab === "Credit Notes" &&
                                 r.status === "Draft" && (
                                   <button
-                                    className="sales-secondary"
+                                    className="si-action-btn si-action-btn--preview"
                                     onClick={async () => {
                                       try {
                                         await api(
                                           `/sales/credit-notes/${r.id}/status`,
                                           {
                                             method: "PATCH",
-                                            body: JSON.stringify({
-                                              status: "Issued",
-                                            }),
+                                            body: JSON.stringify({ status: "Issued" }),
                                           }
                                         );
-
                                         await load();
                                       } catch (e) {
                                         setError(e.message);
@@ -634,19 +636,15 @@ export default function SalesOperations({ activePage }) {
                                 )}
 
                               {tab === "Credit Notes" && (
-                                <button
-                                  className="sales-secondary"
-                                  onClick={() => { setAutoPrintCreditNote(true); setViewCreditNote(r); }}
-                                >
+                                <button className="si-action-btn si-action-btn--print" onClick={() => { setAutoPrintCreditNote(true); setViewCreditNote(r); }}>
+                                  <svg viewBox="0 0 14 14" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 5V1.5h7V5"/><rect x="1.5" y="5" width="11" height="6" rx="1"/><path d="M3.5 9h7" strokeWidth="1"/><circle cx="11.5" cy="7" r="0.6" fill="currentColor"/></svg>
                                   Print
                                 </button>
                               )}
 
                               {tab === "Credit Notes" && (
-                                <button
-                                  className="sales-view-button"
-                                  onClick={() => { setAutoPrintCreditNote(false); setViewCreditNote(r); }}
-                                >
+                                <button className="si-action-btn si-action-btn--preview" onClick={() => { setAutoPrintCreditNote(false); setViewCreditNote(r); }}>
+                                  <svg viewBox="0 0 14 14" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 7s2.5-4.5 6-4.5S13 7 13 7s-2.5 4.5-6 4.5S1 7 1 7z"/><circle cx="7" cy="7" r="1.75"/></svg>
                                   Preview
                                 </button>
                               )}
