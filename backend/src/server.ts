@@ -1147,6 +1147,35 @@ app.post('/api/sales/invoices', requireSupabaseUser, async (req, res) => {
   }
 });
 
+app.put('/api/sales/invoices/:id', requireSupabaseUser, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!id || !Number.isInteger(id)) { res.status(400).json({ error: 'Invalid invoice ID.' }); return; }
+  const body = req.body as Record<string, unknown>;
+  const customer = body.customer && typeof body.customer === 'object' ? customerSnapshot(body.customer as Record<string, unknown>) : null;
+  const totals = buildSalesLines(body.items);
+  const customerId = validCustomerId(customer?.id);
+  const invoiceDate = typeof body.invoiceDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.invoiceDate) ? body.invoiceDate : new Date().toISOString().slice(0, 10);
+  const dueDate = typeof body.dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.dueDate) ? body.dueDate : null;
+  if (!customer?.businessName || !customerId || !totals) { res.status(400).json({ error: 'Provide a saved customer and valid items.' }); return; }
+  try {
+    const result = await pool.query(
+      `UPDATE public.sales_invoices SET
+        customer_id=$1, customer_snapshot=$2::jsonb, items=$3::jsonb,
+        invoice_date=$4, due_date=NULLIF($5,'')::date,
+        subtotal=$6, discount_total=$7, taxable_value=$8, tax_total=$9, grand_total=$10,
+        notes=NULLIF($11,'')
+       WHERE id=$12 AND status NOT IN ('Paid','Void')
+       RETURNING id, invoice_number AS "invoiceNumber", status, grand_total AS "grandTotal"`,
+      [customerId, JSON.stringify(customer), JSON.stringify(totals.lines),
+       invoiceDate, dueDate || '',
+       totals.subtotal, totals.discountTotal, totals.taxableValue, totals.taxTotal, totals.grandTotal,
+       typeof body.notes === 'string' ? body.notes.slice(0, 2000) : '', id]
+    );
+    if (result.rowCount === 0) { res.status(404).json({ error: 'Invoice not found or cannot be edited (Paid/Void).' }); return; }
+    res.json({ success: true, invoice: result.rows[0] });
+  } catch (e) { console.error('Invoice update failed:', e instanceof Error ? e.message : e); res.status(500).json({ error: 'Unable to update invoice.' }); }
+});
+
 app.get('/api/sales/payments', requireSupabaseUser, async (_req, res) => {
   try {
     const result = await pool.query(`SELECT cp.id, cp.receipt_number AS "receiptNumber", cp.customer_id AS "customerId", cp.invoice_id AS "invoiceId",

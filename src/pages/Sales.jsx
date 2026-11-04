@@ -979,6 +979,228 @@ function OrderDetailsModal({ order, onClose, onEdit, autoPrint = false }) {
 
 
 
+function InvoiceDetailsModal({ invoice, onClose, onEdit, autoPrint = false }) {
+  useEffect(() => {
+    if (autoPrint && invoice) {
+      const timer = setTimeout(() => window.print(), 250);
+      return () => clearTimeout(timer);
+    }
+  }, [autoPrint, invoice]);
+
+  if (!invoice) return null;
+
+  const customer = invoice.customer || {};
+  const items = Array.isArray(invoice.items) ? invoice.items : [];
+  const subtotal = Number(invoice.subtotal || 0);
+  const discount = Number(invoice.discountTotal || 0);
+  const taxable = Number(invoice.taxableValue || 0);
+  const tax = Number(invoice.taxTotal || 0);
+  const total = Number(invoice.grandTotal || 0);
+  const paid = Number(invoice.amountPaid || 0);
+  const balance = Math.max(0, total - paid);
+
+  return (
+    <div
+      className="sales-modal-backdrop"
+      role="presentation"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <section
+        className="sales-modal sales-order-details-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="invoice-details-title"
+      >
+        <div className="sales-print-document">
+          <div className="inv-header">
+            <div className="inv-company">
+              <div className="inv-company-name">BHARAT BATTERIES</div>
+              <div className="inv-company-sub">Your Trusted Partner in Power Solutions</div>
+            </div>
+            <div className="inv-meta">
+              <div className="inv-doc-type">TAX INVOICE</div>
+              <div className="inv-meta-row"><span>Invoice No.</span><strong>{invoice.invoiceNumber || `#${invoice.id}`}</strong></div>
+              <div className="inv-meta-row"><span>Invoice Date</span><strong>{formatDate(invoice.invoiceDate)}</strong></div>
+              <div className="inv-meta-row"><span>Due Date</span><strong>{formatDate(invoice.dueDate) || "—"}</strong></div>
+              <div className="inv-meta-row"><span>Status</span><strong>{invoice.status || "Draft"}</strong></div>
+            </div>
+          </div>
+
+          <div className="inv-rule" />
+
+          <div className="inv-bill-section">
+            <div className="inv-section-label">BILL TO</div>
+            <div className="inv-cust-name">{customer.businessName || customer.name || "—"}</div>
+            {customer.contactPerson && <div>{customer.contactPerson}</div>}
+            {(customer.phone || customer.email) && (
+              <div>{customer.phone || ""}{customer.email ? ` · ${customer.email}` : ""}</div>
+            )}
+            {[customer.address, customer.city, customer.state, customer.pincode].filter(Boolean).length > 0 && (
+              <div>{[customer.address, customer.city, customer.state, customer.pincode].filter(Boolean).join(", ")}</div>
+            )}
+            {customer.gstin && <div>GSTIN: {customer.gstin}</div>}
+          </div>
+
+          <table className="inv-items">
+            <thead>
+              <tr>
+                <th>#</th><th>Product</th><th>Code</th><th>Qty</th>
+                <th>Unit Price</th><th>Discount</th><th>GST</th><th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, i) => {
+                const q = Number(item.quantity || 0);
+                const p = Number(item.unitPrice ?? item.dealerPrice ?? 0);
+                const d = Number(item.discountPercent || 0);
+                const t = Number(item.taxPercent ?? 18);
+                const gross = q * p;
+                const da = gross * d / 100;
+                const taxableLine = gross - da;
+                const ga = taxableLine * t / 100;
+                return (
+                  <tr key={i}>
+                    <td>{i + 1}</td>
+                    <td>{item.productName || item.name || "—"}</td>
+                    <td>{item.productCode || "—"}</td>
+                    <td>{q}</td>
+                    <td>{money(p)}</td>
+                    <td>{d > 0 ? `${d}% (${money(da)})` : "—"}</td>
+                    <td>{t}% ({money(ga)})</td>
+                    <td><strong>{money(item.lineTotal ?? taxableLine + ga)}</strong></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          <div className="inv-totals">
+            <div className="inv-total-row"><span>Subtotal</span><span>{money(subtotal)}</span></div>
+            <div className="inv-total-row"><span>Discount</span><span>− {money(discount)}</span></div>
+            <div className="inv-total-row"><span>Taxable Value</span><span>{money(taxable)}</span></div>
+            <div className="inv-total-row"><span>GST</span><span>{money(tax)}</span></div>
+            <div className="inv-total-row inv-grand"><span>Grand Total</span><span>{money(total)}</span></div>
+            {paid > 0 && <div className="inv-total-row"><span>Amount Paid</span><span>− {money(paid)}</span></div>}
+            {paid > 0 && <div className="inv-total-row inv-grand"><span>Balance Due</span><span>{money(balance)}</span></div>}
+          </div>
+
+          {invoice.notes && <div className="inv-notes"><strong>Notes:</strong> {invoice.notes}</div>}
+
+          <div className="inv-signatures">
+            <div className="inv-sig-box"><div className="inv-sig-line" /><div>Customer Signature</div></div>
+            <div className="inv-sig-box"><div className="inv-sig-line" /><div>For BHARAT BATTERIES<br />Authorised Signatory</div></div>
+          </div>
+
+          <div className="inv-footer-text">This is a computer-generated tax invoice. Subject to jurisdiction of local courts.</div>
+        </div>
+
+        <header>
+          <div>
+            <span className="sales-eyebrow">INVOICE DETAILS</span>
+            <h2 id="invoice-details-title">{invoice.invoiceNumber || `Invoice #${invoice.id}`}</h2>
+            <p>Issued on {formatDate(invoice.invoiceDate)}</p>
+          </div>
+          <button type="button" className="sales-close" onClick={onClose} aria-label="Close">×</button>
+        </header>
+
+        <div className="sales-details-section">
+          <div className="sales-details-heading">
+            <h3>Invoice information</h3>
+            <span className={`sales-status ${statusClass(invoice.status)}`}>{invoice.status || "Draft"}</span>
+          </div>
+          <div className="sales-details-grid">
+            <div><span>Invoice number</span><strong>{invoice.invoiceNumber || "—"}</strong></div>
+            <div><span>Invoice date</span><strong>{formatDate(invoice.invoiceDate)}</strong></div>
+            <div><span>Due date</span><strong>{formatDate(invoice.dueDate) || "—"}</strong></div>
+            <div><span>Balance due</span><strong>{money(balance)}</strong></div>
+          </div>
+        </div>
+
+        <div className="sales-details-section">
+          <h3>Customer information</h3>
+          <div className="sales-details-grid">
+            <div><span>Business name</span><strong>{customer.businessName || "—"}</strong></div>
+            <div><span>Contact</span><strong>{customer.contactPerson || customer.name || "—"}</strong></div>
+            <div><span>Phone</span><strong>{customer.phone || "—"}</strong></div>
+            <div><span>Email</span><strong>{customer.email || "—"}</strong></div>
+            <div className="sales-details-full">
+              <span>Address</span>
+              <strong>{[customer.address, customer.city, customer.state, customer.pincode].filter(Boolean).join(", ") || "—"}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="sales-details-section">
+          <h3>Invoice items</h3>
+          <div className="sales-table-wrap sales-details-table-wrap">
+            <table className="sales-table sales-details-table">
+              <thead>
+                <tr>
+                  <th>Product</th><th>Code</th><th>Qty</th><th>MRP</th>
+                  <th>Unit price</th><th>Discount</th><th>GST</th><th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.length === 0 ? (
+                  <tr><td colSpan={8} className="sales-empty">No item details available.</td></tr>
+                ) : (
+                  items.map((item, i) => {
+                    const quantity = Number(item.quantity || 0);
+                    const unitPrice = Number(item.unitPrice || 0);
+                    const discountPercent = Number(item.discountPercent || 0);
+                    const taxPercent = Number(item.taxPercent || 0);
+                    const gross = quantity * unitPrice;
+                    const discountAmount = gross * (discountPercent / 100);
+                    const taxableAmount = gross - discountAmount;
+                    const taxAmount = taxableAmount * (taxPercent / 100);
+                    return (
+                      <tr key={i}>
+                        <td>
+                          <strong>{item.productName || item.name || "—"}</strong>
+                          {(item.brand || item.modelSku) && (
+                            <small className="sales-item-subtitle">{[item.brand, item.modelSku].filter(Boolean).join(" ")}</small>
+                          )}
+                        </td>
+                        <td>{item.productCode || "—"}</td>
+                        <td>{quantity}</td>
+                        <td>{money(item.mrp)}</td>
+                        <td>{money(unitPrice)}</td>
+                        <td>{discountPercent}% <small>{money(discountAmount)}</small></td>
+                        <td>{taxPercent}% <small>{money(taxAmount)}</small></td>
+                        <td><strong>{money(taxableAmount + taxAmount)}</strong></td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="sales-details-bottom">
+          <div className="sales-details-notes">
+            <h3>Notes</h3>
+            <p>{invoice.notes || "No notes added."}</p>
+          </div>
+          <div className="sales-totals sales-details-totals">
+            <span>Subtotal <b>{money(subtotal)}</b></span>
+            <span>Discount <b>{money(discount)}</b></span>
+            <span>Taxable value <b>{money(taxable)}</b></span>
+            <span>GST <b>{money(tax)}</b></span>
+            <span className="sales-grand-total">Grand total <b>{money(total)}</b></span>
+            {paid > 0 && <span>Paid <b>{money(paid)}</b></span>}
+            {paid > 0 && <span className="sales-grand-total">Balance due <b>{money(balance)}</b></span>}
+          </div>
+        </div>
+
+        <footer className="sales-details-footer">
+          <button type="button" className="sales-secondary" onClick={onClose}>Close</button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
 export default function Sales({ activePage = "Sales" }) {
   const location = useLocation();
 
@@ -1017,7 +1239,12 @@ export default function Sales({ activePage = "Sales" }) {
 
   const [autoPrint, setAutoPrint] = useState(false);
 
+  const [viewInvoice, setViewInvoice] = useState(null);
+  const [autoPrintInvoice, setAutoPrintInvoice] = useState(false);
+
   const [editingOrder, setEditingOrder] = useState(null);
+
+  const [editingInvoice, setEditingInvoice] = useState(null);
 
 
 
@@ -1190,6 +1417,7 @@ export default function Sales({ activePage = "Sales" }) {
   const openCreate = () => {
 
     setEditingOrder(null);
+    setEditingInvoice(null);
     setError("");
 
     setNotice("");
@@ -1265,6 +1493,37 @@ export default function Sales({ activePage = "Sales" }) {
     setModal(true);
   };
 
+  const openEditInvoice = (invoice) => {
+    setError("");
+    setNotice("");
+    const legacyItems = Array.isArray(invoice.items) ? invoice.items : [];
+    const items = legacyItems.length
+      ? legacyItems.map((item) => ({
+          ...emptyLine(),
+          ...item,
+          quantity: item.quantity ?? 1,
+          unitPrice: item.unitPrice ?? item.dealerPrice ?? 0,
+          discountPercent: item.discountPercent ?? 0,
+          taxPercent: item.taxPercent ?? 18,
+        }))
+      : [emptyLine()];
+
+    setEditingInvoice(invoice);
+    setForm({
+      documentNumber: invoice.invoiceNumber || "",
+      customerId: String(invoice.customer?.id || ""),
+      invoiceId: "",
+      date: String(invoice.invoiceDate || today()).slice(0, 10),
+      dueDate: String(invoice.dueDate || "").slice(0, 10),
+      amount: "",
+      paymentMethod: "UPI",
+      referenceNumber: "",
+      notes: invoice.notes || "",
+      items,
+    });
+    setModal(true);
+  };
+
 
 
   const save = async (event) => {
@@ -1333,13 +1592,13 @@ export default function Sales({ activePage = "Sales" }) {
 
 
 
-          result = await api("/sales/invoices", {
-
-            method: "POST",
-
-            body: JSON.stringify(payload),
-
-          });
+          result = await api(
+            editingInvoice ? `/sales/invoices/${editingInvoice.id}` : "/sales/invoices",
+            {
+              method: editingInvoice ? "PUT" : "POST",
+              body: JSON.stringify(payload),
+            }
+          );
 
         }
 
@@ -1350,10 +1609,13 @@ export default function Sales({ activePage = "Sales" }) {
       setNotice(
         editingOrder
           ? "Sales order updated successfully."
+          : editingInvoice
+          ? "Invoice updated successfully."
           : `${tab.slice(0, -1)} saved successfully.`
       );
 
       setEditingOrder(null);
+      setEditingInvoice(null);
       setModal(false);
 
       await load();
@@ -1408,6 +1670,8 @@ export default function Sales({ activePage = "Sales" }) {
           "Paid",
 
           "Balance",
+
+          "Actions",
 
         ];
 
@@ -1718,6 +1982,34 @@ export default function Sales({ activePage = "Sales" }) {
 
                             <td>{money(balance)}</td>
 
+                            <td>
+                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                {!["Paid", "Void", "Cancelled"].includes(record.status) && (
+                                  <button
+                                    type="button"
+                                    className="sales-secondary"
+                                    onClick={() => openEditInvoice(record)}
+                                  >
+                                    Edit
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  className="sales-secondary"
+                                  onClick={() => { setAutoPrintInvoice(true); setViewInvoice(record); }}
+                                >
+                                  Print
+                                </button>
+                                <button
+                                  type="button"
+                                  className="sales-view-button"
+                                  onClick={() => { setAutoPrintInvoice(false); setViewInvoice(record); }}
+                                >
+                                  Preview
+                                </button>
+                              </div>
+                            </td>
+
                           </tr>
 
                         );
@@ -1780,7 +2072,7 @@ export default function Sales({ activePage = "Sales" }) {
 
               <h2 id="sales-modal-title">
 
-                {editingOrder ? "Edit Draft Sales Order" : `New ${tab === "Orders" ? "sales order" : "sales invoice"}`}
+                {editingOrder ? "Edit Draft Sales Order" : editingInvoice ? "Edit Invoice" : `New ${tab === "Orders" ? "sales order" : "sales invoice"}`}
 
               </h2>
 
@@ -1836,7 +2128,7 @@ export default function Sales({ activePage = "Sales" }) {
 
                 maxLength="80"
 
-                disabled={Boolean(editingOrder)}
+                disabled={Boolean(editingOrder) || Boolean(editingInvoice)}
 
                 value={form.documentNumber}
 
@@ -2352,7 +2644,7 @@ export default function Sales({ activePage = "Sales" }) {
 
               >
 
-                {saving ? "Saving…" : editingOrder ? "Update Draft" : "Save record"}
+                {saving ? "Saving…" : (editingOrder || editingInvoice) ? "Update" : "Save record"}
 
               </button>
 
@@ -2386,6 +2678,15 @@ export default function Sales({ activePage = "Sales" }) {
 
   )
 }
+
+{viewInvoice && (
+  <InvoiceDetailsModal
+    invoice={viewInvoice}
+    onClose={() => { setViewInvoice(null); setAutoPrintInvoice(false); }}
+    onEdit={openEditInvoice}
+    autoPrint={autoPrintInvoice}
+  />
+)}
 
     </div >
 
