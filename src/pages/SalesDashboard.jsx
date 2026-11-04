@@ -1,49 +1,366 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { supabase } from "../lib/supabase";
 import "./Sales.css";
+import "./SalesDashboard.css";
 
 const API_BASE = (
   import.meta.env.VITE_PRODUCTS_API_URL ||
   "http://127.0.0.1:3001/api/products"
-).replace(/\/products\/?$/, "");const money = (value) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(value || 0));
+).replace(/\/products\/?$/, "");
+
+const money = (v) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Number(v || 0));
 
 async function api(path) {
   const { data: { session }, error } = await supabase.auth.getSession();
-  if (error || !session?.access_token) throw new Error("Your session has expired. Please sign in again.");
-  const response = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, cache: "no-store" });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || `Request failed (${response.status}).`);
+  if (error || !session?.access_token)
+    throw new Error("Your session has expired. Please sign in again.");
+  const r = await fetch(`${API_BASE}${path}`, {
+    headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.error || `Request failed (${r.status}).`);
   return body;
 }
 
+const STATUS_COLOR = {
+  Draft: "#6366f1",
+  Confirmed: "#16a34a",
+  Cancelled: "#ef4444",
+  Paid: "#0ea5e9",
+};
+
+function DonutChart({ segments, size = 140, thickness = 24 }) {
+  const r = (size / 2) - (thickness / 2);
+  const C = 2 * Math.PI * r;
+  const cx = size / 2;
+  const cy = size / 2;
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+
+  if (!total) {
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e2e8f0" strokeWidth={thickness} />
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize="13" fill="#9ca3af">No data</text>
+      </svg>
+    );
+  }
+
+  let cumPct = 0;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f1f5f9" strokeWidth={thickness} />
+      {segments.map((seg, i) => {
+        const pct = seg.value / total;
+        const dash = pct * C;
+        const dashOffset = C * (1 - cumPct);
+        cumPct += pct;
+        return (
+          <circle
+            key={i}
+            cx={cx} cy={cy} r={r}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth={thickness - 2}
+            strokeDasharray={`${dash} ${C - dash}`}
+            strokeDashoffset={dashOffset}
+            style={{ transform: `rotate(-90deg)`, transformOrigin: `${cx}px ${cy}px` }}
+          />
+        );
+      })}
+      <text x={cx} y={cy - 6} textAnchor="middle" fontSize="22" fontWeight="800" fill="#17294a">{total}</text>
+      <text x={cx} y={cy + 12} textAnchor="middle" fontSize="9" fill="#72809a" letterSpacing="0.5">ORDERS</text>
+    </svg>
+  );
+}
+
+function IconOrders() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <path d="M16 10a4 4 0 01-8 0" />
+    </svg>
+  );
+}
+function IconInvoice() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+    </svg>
+  );
+}
+function IconPayment() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <line x1="2" y1="10" x2="22" y2="10" />
+    </svg>
+  );
+}
+function IconAlert() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
 export default function SalesDashboard({ activePage = "Sales Dashboard" }) {
+  const navigate = useNavigate();
   const [summary, setSummary] = useState(null);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
   const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try { setSummary(await api("/sales/summary")); }
-    catch (e) { setError(e.message || "Unable to load sales analytics."); }
-    finally { setLoading(false); }
+    setLoading(true);
+    setError("");
+    try {
+      const [sum, ord] = await Promise.all([
+        api("/sales/summary"),
+        api("/sales/orders?search="),
+      ]);
+      setSummary(sum);
+      setOrders(ord.data || []);
+    } catch (e) {
+      setError(e.message || "Unable to load sales analytics.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
   useEffect(() => { load(); }, [load]);
+
+  // Status breakdown counts
+  const statusCounts = orders.reduce((acc, o) => {
+    const s = o.status || "Unknown";
+    acc[s] = (acc[s] || 0) + 1;
+    return acc;
+  }, {});
+
+  // Status breakdown by value
+  const statusValues = orders.reduce((acc, o) => {
+    const s = o.status || "Unknown";
+    acc[s] = (acc[s] || 0) + Number(o.grandTotal || 0);
+    return acc;
+  }, {});
+
+  const totalOrderValue = Object.values(statusValues).reduce((s, v) => s + v, 0);
+
+  const donutSegments = Object.entries(statusCounts).map(([status, count]) => ({
+    label: status,
+    value: count,
+    color: STATUS_COLOR[status] || "#94a3b8",
+  }));
+
+  const invoiceValue = Number(summary?.invoices?.value || 0);
+  const received = Number(summary?.payments?.received || 0);
+  const outstanding = Number(summary?.invoices?.outstanding || 0);
+  const efficiency =
+    invoiceValue > 0 ? Math.min(100, Math.round((received / invoiceValue) * 100)) : 0;
+
+  const todayLabel = new Date().toLocaleDateString("en-IN", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
   return (
     <div className="sales-page-shell">
       <Sidebar activePage={activePage} />
       <main className="sales-main">
         <Topbar activePage={activePage} />
-        <div className="sales-content">
-          <div className="sales-heading"><div><span className="sales-eyebrow">BUSINESS MANAGEMENT</span><h1>Sales Dashboard</h1><p>Sales performance, revenue, collections and outstanding balance overview.</p></div></div>
+
+        <div className="sd-content">
+          {/* Header */}
+          <div className="sd-header">
+            <div>
+              <span className="sales-eyebrow">BUSINESS MANAGEMENT</span>
+              <h1>Sales Dashboard</h1>
+              <p>{todayLabel}</p>
+            </div>
+            <div className="sd-header-actions">
+              <button className="sales-secondary" onClick={() => navigate("/sales/orders")}>+ New Order</button>
+              <button className="sales-primary" onClick={() => navigate("/sales/invoices")}>+ New Invoice</button>
+            </div>
+          </div>
+
           {error && <div className="sales-error">{error}</div>}
-          {loading && <p>Loading sales analytics...</p>}
-          <section className="sales-stats">
-            <article><span>Sales orders</span><strong>{summary?.orders?.count ?? "—"}</strong><small>{money(summary?.orders?.value)} order value</small></article>
-            <article><span>Invoices</span><strong>{summary?.invoices?.count ?? "—"}</strong><small>{money(summary?.invoices?.value)} invoice value</small></article>
-            <article><span>Payments received</span><strong>{money(summary?.payments?.received)}</strong><small>Recorded receipts</small></article>
-            <article><span>Outstanding</span><strong>{money(summary?.invoices?.outstanding)}</strong><small>Invoices less received payments</small></article>
-          </section>
+
+          {/* KPI Cards */}
+          <div className="sd-kpi-row">
+            <div className="sd-kpi sd-kpi--blue">
+              <div className="sd-kpi-icon"><IconOrders /></div>
+              <div className="sd-kpi-body">
+                <span>Sales Orders</span>
+                <strong>{loading ? "—" : (summary?.orders?.count ?? "0")}</strong>
+                <small>{money(summary?.orders?.value)} total value</small>
+              </div>
+            </div>
+            <div className="sd-kpi sd-kpi--green">
+              <div className="sd-kpi-icon"><IconInvoice /></div>
+              <div className="sd-kpi-body">
+                <span>Invoices</span>
+                <strong>{loading ? "—" : (summary?.invoices?.count ?? "0")}</strong>
+                <small>{money(invoiceValue)} invoice value</small>
+              </div>
+            </div>
+            <div className="sd-kpi sd-kpi--indigo">
+              <div className="sd-kpi-icon"><IconPayment /></div>
+              <div className="sd-kpi-body">
+                <span>Payments Received</span>
+                <strong>{loading ? "—" : money(received)}</strong>
+                <small>Recorded receipts</small>
+              </div>
+            </div>
+            <div className="sd-kpi sd-kpi--amber">
+              <div className="sd-kpi-icon"><IconAlert /></div>
+              <div className="sd-kpi-body">
+                <span>Outstanding</span>
+                <strong>{loading ? "—" : money(outstanding)}</strong>
+                <small>Unpaid invoice balance</small>
+              </div>
+            </div>
+          </div>
+
+          {/* Charts row */}
+          <div className="sd-charts-row">
+            {/* Donut — Order Status */}
+            <div className="sd-card">
+              <div className="sd-card-header"><h2>Order Status</h2></div>
+              <div className="sd-donut-wrap">
+                <DonutChart segments={donutSegments} />
+                <div className="sd-donut-legend">
+                  {donutSegments.map((seg) => (
+                    <div key={seg.label} className="sd-legend-item">
+                      <span className="sd-legend-dot" style={{ background: seg.color }} />
+                      <span className="sd-legend-label">{seg.label}</span>
+                      <strong className="sd-legend-val">{seg.value}</strong>
+                    </div>
+                  ))}
+                  {donutSegments.length === 0 && (
+                    <p className="sd-empty" style={{ padding: 0, textAlign: "left" }}>No orders yet.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Collection Efficiency */}
+            <div className="sd-card">
+              <div className="sd-card-header"><h2>Collection Efficiency</h2></div>
+              <div className="sd-gauge-wrap">
+                <div className="sd-gauge-label">
+                  <span>{loading ? "—" : `${efficiency}%`}</span>
+                  <small>of invoice value collected</small>
+                </div>
+                <div className="sd-gauge-bar">
+                  <div className="sd-gauge-fill" style={{ width: loading ? "0%" : `${efficiency}%` }} />
+                </div>
+                <div className="sd-gauge-ticks">
+                  {[0, 25, 50, 75, 100].map((t) => (
+                    <span key={t}>{t}%</span>
+                  ))}
+                </div>
+                <div className="sd-gauge-pills">
+                  <div className="sd-gauge-pill sd-gauge-pill--green">
+                    <span>Collected</span>
+                    <strong>{money(received)}</strong>
+                  </div>
+                  <div className="sd-gauge-pill sd-gauge-pill--amber">
+                    <span>Outstanding</span>
+                    <strong>{money(outstanding)}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="sd-card">
+              <div className="sd-card-header"><h2>Quick Actions</h2></div>
+              <div className="sd-action-grid">
+                <button className="sd-action-btn" onClick={() => navigate("/sales/orders")}>
+                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  New Order
+                </button>
+                <button className="sd-action-btn" onClick={() => navigate("/sales/invoices")}>
+                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                  New Invoice
+                </button>
+                <button className="sd-action-btn" onClick={() => navigate("/sales-operations/delivery-challans")}>
+                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="1" y="3" width="15" height="13" />
+                    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                    <circle cx="5.5" cy="18.5" r="2.5" />
+                    <circle cx="18.5" cy="18.5" r="2.5" />
+                  </svg>
+                  Challan
+                </button>
+                <button className="sd-action-btn" onClick={() => navigate("/sales-operations/credit-notes")}>
+                  <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23" />
+                    <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+                  </svg>
+                  Credit Note
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Revenue by Status — stacked bar */}
+          {totalOrderValue > 0 && (
+            <div className="sd-card sd-revenue-card">
+              <div className="sd-card-header">
+                <h2>Revenue by Order Status</h2>
+                <span className="sd-revenue-total">{money(totalOrderValue)} total</span>
+              </div>
+              <div className="sd-revenue-body">
+                <div className="sd-stacked-bar">
+                  {Object.entries(statusValues).map(([status, val]) => (
+                    <div
+                      key={status}
+                      className="sd-stacked-seg"
+                      style={{
+                        width: `${(val / totalOrderValue) * 100}%`,
+                        background: STATUS_COLOR[status] || "#94a3b8",
+                      }}
+                      title={`${status}: ${money(val)}`}
+                    />
+                  ))}
+                </div>
+                <div className="sd-stacked-legend">
+                  {Object.entries(statusValues).map(([status, val]) => (
+                    <div key={status} className="sd-stacked-item">
+                      <span className="sd-legend-dot" style={{ background: STATUS_COLOR[status] || "#94a3b8" }} />
+                      <span>{status}</span>
+                      <strong>{money(val)}</strong>
+                      <em>{Math.round((val / totalOrderValue) * 100)}%</em>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </main>
     </div>

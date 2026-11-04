@@ -7,6 +7,7 @@ import Quotation from "./pages/Quotation";
 import Customers from "./pages/Customers";
 import Sales from "./pages/Sales";
 import SalesOperations from "./pages/SalesOperations";
+import PaymentEntry from "./pages/PaymentEntry";
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -86,6 +87,12 @@ export default function App() {
               <Route
                 path="/sales-operations"
                 element={<SalesOperations />}
+              />
+
+              {/* Accounting - Payment Entry */}
+              <Route
+                path="/accounting/payment-entry"
+                element={<PaymentEntry activePage="Payment Entry" />}
               />
             </Route>
 
