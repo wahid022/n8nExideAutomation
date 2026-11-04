@@ -283,7 +283,25 @@ export default function Quotation({ activePage = "Quotation", onNavigate = () =>
 
           {error && <div className="bb-alert error no-print bb-actions-error" role="alert">{error}</div>}
           {notice && <div className="bb-alert no-print bb-actions-notice" role="status">{notice}</div>}
-          <div className="bb-quotation-actions no-print"><button type="button" className="bb-plain-button" onClick={clearQuotation}>Clear items</button><span/><button type="button" className="bb-outline-button" disabled={busy} onClick={() => saveQuotation("Draft")}>{busy ? "Saving…" : "▣ Save draft"}</button><button type="button" className="bb-primary-button" disabled={busy} onClick={generatePdf}>{busy ? "Saving quotation…" : "▤ Generate quotation PDF"}</button></div>
+          <div className="bb-quotation-actions no-print">
+            <button type="button" className="bb-plain-button bb-clear-btn" onClick={clearQuotation}>
+              <svg viewBox="0 0 16 16" fill="none" width="13" height="13" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign:"middle",marginRight:5}}><line x1="4" y1="4" x2="12" y2="12" stroke="currentColor"/><line x1="12" y1="4" x2="4" y2="12" stroke="currentColor"/></svg>
+              Clear items
+            </button>
+            <span/>
+            <button type="button" className="bb-outline-button" disabled={busy} onClick={() => saveQuotation("Draft")}>
+              {busy ? "Saving…" : (<>
+                <svg viewBox="0 0 16 16" fill="none" width="14" height="14" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign:"middle",marginRight:5}}><path d="M2.5 10.5v2a1 1 0 001 1h9a1 1 0 001-1v-2" stroke="currentColor"/><path d="M8 2.5v7M5.5 7l2.5 3 2.5-3" stroke="currentColor"/></svg>
+                Save draft
+              </>)}
+            </button>
+            <button type="button" className="bb-primary-button" disabled={busy} onClick={generatePdf}>
+              {busy ? "Saving quotation…" : (<>
+                <svg viewBox="0 0 16 16" fill="none" width="14" height="14" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign:"middle",marginRight:5}}><rect x="2" y="6" width="12" height="8" rx="1" stroke="currentColor"/><path d="M4 6V4a1 1 0 011-1h6a1 1 0 011 1v2" stroke="currentColor"/><line x1="5.5" y1="10" x2="10.5" y2="10" stroke="currentColor"/></svg>
+                Generate quotation PDF
+              </>)}
+            </button>
+          </div>
 
           <article className="bb-print-document"><header><div className="bb-print-brand"><div className="bb-print-mark">BB</div><div><h1>{supplier.businessName || "Bharat Batteries"}</h1><p>{supplier.tagline}</p><p>{supplier.address}</p><p>Phone: {supplier.phone || "—"} · {supplier.email || "—"}</p><p>GSTIN: {supplier.gstin || "—"}</p></div></div><div className="bb-print-label"><h2>ESTIMATE / QUOTATION</h2><p>No: {quote.number}</p><p>Date: {quote.date}</p><p>Valid: {quote.validDays} days</p></div></header><section className="bb-print-customer"><strong>QUOTATION FOR</strong><h3>{customer.company || "Customer"}</h3><p>{customer.name} · {customer.phone}</p><p>{customer.address}</p>{customer.gstin && <p>GSTIN: {customer.gstin}</p>}</section><table><thead><tr><th>#</th><th>Item</th><th>Qty</th><th>Rate</th><th>Discount</th>{taxMode === "gst" && <th>GST</th>}<th>Amount</th></tr></thead><tbody>{totals.rows.map((r,i)=><tr key={r.id}><td>{i+1}</td><td>{valueOf(r.product,"product_name","Model / SKU")}<small>{r.id} · {valueOf(r.product,"brand","Brand")}</small></td><td>{r.qty} {r.unit}</td><td>{money(r.rate)}</td><td>{r.discountPercent}%</td>{taxMode === "gst" && <td>{r.gstRate}%</td>}<td>{money(r.lineTotal)}</td></tr>)}</tbody></table><div className="bb-print-total"><p>Subtotal: {money(totals.subtotal)}</p><p>Discount: {money(totals.discountTotal)}</p><p>Taxable value: {money(totals.taxableValue)}</p>{taxMode === "gst" && <p>GST: {money(totals.taxTotal)}</p>}<h2>Grand total: {money(totals.grandTotal)}</h2></div><section className="bb-print-terms"><strong>Notes / Terms</strong><p>{quote.terms || "Subject to availability."}</p></section><footer>For {supplier.businessName || "Bharat Batteries"}<br/><br/>Authorised Signatory</footer></article>
         </main>

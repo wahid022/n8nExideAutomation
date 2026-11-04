@@ -36,3 +36,161 @@
 /* Customer selection is read-only until the explicit Edit customer action is used. */
 .quotation-area .bb-customer-readonly input[readonly],.quotation-area .bb-customer-readonly textarea[readonly]{background:#f5f7fb;color:#4f607a;border-color:#e1e7f0;cursor:default}
 .quotation-area .bb-customer-hint{margin:10px 0 0;padding:12px 14px;border:1px dashed #d8e2ef;border-radius:8px;color:#74839a;font-size:12px;background:#fbfcfe}
+
+/* ============================================================
+   QUOTATION PAGE — ENHANCED UI
+   ============================================================ */
+
+/* Richer page background */
+.quotation-area .quotation-content {
+  background: linear-gradient(165deg, #eef4ff 0%, #f6f9fd 55%, #f3f6fb 100%);
+}
+
+/* Gradient heading text */
+.quotation-area .bb-quote-heading h1 {
+  background: linear-gradient(130deg, #0d1f46 0%, #1253d4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Polished step indicators */
+.quotation-area .bb-quote-steps span { padding: 4px 0; }
+.quotation-area .bb-quote-steps b {
+  width: 30px;
+  height: 30px;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(0,0,0,.1);
+  transition: all 0.2s;
+}
+.quotation-area .bb-quote-steps .active b {
+  background: linear-gradient(135deg, #0866f5, #0040c1);
+  box-shadow: 0 4px 14px #0866f545;
+  transform: scale(1.1);
+}
+.quotation-area .bb-quote-steps i {
+  width: 44px;
+  height: 2px;
+  background: linear-gradient(90deg, #bdd0ea, #dbe6f4);
+  border-radius: 2px;
+}
+
+/* Panel cards — more depth */
+.quotation-area .bb-quote-panel {
+  border-radius: 14px;
+  box-shadow: 0 4px 22px #233f6510, 0 1px 4px #233f650a;
+  border-color: #d4e3f4;
+}
+
+/* Coloured left-border accents per panel */
+.quotation-area .bb-customer-panel { border-left: 3px solid #0866f5; }
+.quotation-area .bb-items-panel    { border-left: 3px solid #0866f5; }
+.quotation-area .bb-tax-panel      { border-left: 3px solid #7c3aed; }
+.quotation-area .bb-extra-panel    { border-left: 3px solid #0ea5e9; }
+.quotation-area .bb-summary-panel  { border-top: 3px solid #0866f5; border-radius: 14px; }
+
+/* Panel title icons — gradient blue */
+.quotation-area .bb-title-icon {
+  background: linear-gradient(135deg, #0866f5, #0040c1);
+  color: #fff;
+  box-shadow: 0 4px 12px #0866f530;
+  border-radius: 10px;
+}
+
+/* Items table — navy header */
+.quotation-area .bb-items-table th {
+  background: #17365d;
+  color: #ddeeff;
+  border-right-color: #1e4880;
+  border-bottom-color: #1e4880;
+  font-size: 10.5px;
+  letter-spacing: 0.3px;
+}
+.quotation-area .bb-items-table th small { color: #93b8e0; }
+.quotation-area .bb-items-table tbody tr:nth-child(odd)  { background: #fff; }
+.quotation-area .bb-items-table tbody tr:nth-child(even) { background: #f8fafd; }
+.quotation-area .bb-items-table tbody tr:hover           { background: #eef5ff; }
+.quotation-area .bb-amount-cell { color: #17365d; font-size: 12px; font-weight: 700; }
+
+/* Summary panel */
+.quotation-area .bb-summary-panel h2 {
+  padding-bottom: 12px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #e3edf6;
+}
+.quotation-area .bb-grand-total {
+  background: linear-gradient(135deg, #0556d4, #0866f5);
+  color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px #0866f535;
+  margin-top: 12px;
+}
+.quotation-area .bb-grand-total strong:first-child { font-size: 13px; opacity: .9; }
+.quotation-area .bb-grand-total strong:last-child  { font-size: 21px; }
+
+/* Action area — card wrapper + polished buttons */
+.quotation-area .bb-quotation-actions {
+  margin-top: 20px;
+  padding: 16px 20px;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #d4e3f4;
+  box-shadow: 0 4px 18px #233f6508;
+  gap: 10px;
+}
+.quotation-area .bb-primary-button {
+  background: linear-gradient(135deg, #0866f5, #0040c1);
+  border-color: transparent;
+  box-shadow: 0 4px 14px #0866f535;
+  font-size: 13px;
+  padding: 10px 22px;
+  transition: all 0.15s;
+}
+.quotation-area .bb-primary-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0556d4, #0038a8);
+  box-shadow: 0 6px 20px #0866f545;
+  transform: translateY(-1px);
+}
+.quotation-area .bb-outline-button {
+  font-size: 13px;
+  padding: 10px 20px;
+}
+.quotation-area .bb-clear-btn {
+  color: #64748b;
+  border-color: #e2e8f0;
+  font-size: 12px;
+}
+.quotation-area .bb-clear-btn:hover { background: #fff0f0; border-color: #fca5a5; color: #b91c1c; }
+
+/* Search input with magnifying glass */
+.quotation-area .bb-customer-search input {
+  padding-left: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='9' r='6'/%3E%3Cline x1='14' y1='14' x2='12.5' y2='12.5'/%3E%3C/svg%3E");
+  background-position: 11px center;
+  background-size: 15px;
+  background-repeat: no-repeat;
+}
+
+/* Product picker area */
+.quotation-area .bb-product-picker {
+  background: linear-gradient(180deg, #f8fbff, #f3f7fe);
+  border-bottom-color: #d4e3f4;
+}
+
+/* Tax help info box */
+.quotation-area .bb-tax-help {
+  background: linear-gradient(135deg, #edf4ff, #f0f6ff);
+  border: 1px solid #c4d8f7;
+  color: #3d5a88;
+}
+
+/* Customer hint placeholder */
+.quotation-area .bb-customer-hint {
+  background: linear-gradient(135deg, #f8fbff, #f4f8fd);
+  border-color: #c4d4eb;
+  border-radius: 10px;
+}
+
+/* Alert bars near action buttons */
+.quotation-area .bb-actions-error  { border-left: 3px solid #ef4444; border-radius: 10px; }
+.quotation-area .bb-actions-notice { border-left: 3px solid #22c55e; border-radius: 10px; }
