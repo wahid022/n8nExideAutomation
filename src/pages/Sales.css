@@ -761,9 +761,14 @@
     display: none !important;
 }
 
-/* Keep print document visible when inside a preview modal */
+/* Keep print document visible in simple modals (Credit Notes, Debit Notes) */
 .sales-modal .sales-print-document {
     display: block !important;
+}
+
+/* Hide print document in sidebar-style details modals (has its own sidebar for screen view) */
+.sales-order-details-modal .sales-print-document {
+    display: none;
 }
 
 /* =========================================================
@@ -781,8 +786,9 @@
         visibility: hidden !important;
     }
 
-    /* Pull the print document to the very top of the page */
-    .sales-print-document {
+    /* Pull the print document to the very top of the page (covers both modal types) */
+    .sales-print-document,
+    .sales-order-details-modal .sales-print-document {
         display: block !important;
         visibility: visible !important;
         position: fixed !important;

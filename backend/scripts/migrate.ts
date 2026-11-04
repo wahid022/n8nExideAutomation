@@ -30,6 +30,10 @@ const migrations = [
     version: '006_sales_workflows',
     file: '../sql/migrations/006_sales_workflows.sql',
   },
+  {
+    version: '007_purchase_module',
+    file: '../sql/migrations/007_purchase_module.sql',
+  },
 ];
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));

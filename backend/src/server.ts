@@ -1325,6 +1325,327 @@ app.get('/api/sales/customer-ledger/:customerId', requireSupabaseUser, async (re
 app.patch('/api/sales/invoices/:id/status', requireSupabaseUser, async (req, res) => { const id = validCustomerId(req.params.id); const status = String(req.body?.status || ''); if (!id || !['Issued', 'Void'].includes(status)) { res.status(400).json({ error: 'Only Issued or Void status is accepted here.' }); return; } const client = await pool.connect(); try { await client.query('BEGIN'); const inv = await client.query('SELECT id,status FROM public.sales_invoices WHERE id=$1 FOR UPDATE', [id]); if (!inv.rowCount) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Invoice not found.' }); return; } if (inv.rows[0].status !== 'Draft') { await client.query('ROLLBACK'); res.status(409).json({ error: 'Only draft invoices may be voided; void invoices cannot be changed.' }); return; } const r = await client.query(`UPDATE public.sales_invoices SET status=$2,updated_at=NOW() WHERE id=$1 RETURNING id,invoice_number AS "invoiceNumber",status`, [id, status]); await client.query(`INSERT INTO public.sales_document_audit(document_type,document_id,action,before_data,after_data,actor_id) VALUES('Invoice',$1,$2,$3::jsonb,$4::jsonb,$5)`, [id, 'status changed', JSON.stringify(inv.rows[0]), JSON.stringify(r.rows[0]), (res.locals.authenticatedUser as AuthenticatedUser).id]); await client.query('COMMIT'); res.json({ success: true, invoice: r.rows[0] }); } catch (e) { await client.query('ROLLBACK').catch(() => undefined); res.status(500).json({ error: 'Unable to update invoice status.' }); } finally { client.release(); } });
 
 // -----------------------------------------------------------------------------
+// Purchase module APIs (vendors, purchase orders, purchase invoices, debit notes)
+// -----------------------------------------------------------------------------
+
+function vendorSnapshot(v: Record<string, unknown>) {
+  return {
+    id: v.id ?? null,
+    businessName: String(v.businessName ?? '').trim().slice(0, 200),
+    contactName: String(v.contactName ?? '').trim().slice(0, 200),
+    phone: String(v.phone ?? '').trim().slice(0, 40),
+    gstin: String(v.gstin ?? '').trim().slice(0, 15),
+    billingAddress: String(v.billingAddress ?? '').trim().slice(0, 1000),
+    state: String(v.state ?? '').trim().slice(0, 100),
+  };
+}
+
+// Vendors
+app.get('/api/vendors', requireSupabaseUser, async (req, res) => {
+  const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
+  try {
+    const r = await pool.query(
+      `SELECT id, business_name AS "businessName", contact_name AS "contactName",
+              phone, gstin, billing_address AS "billingAddress", state, vendor_type AS "vendorType"
+       FROM public.vendors
+       WHERE $1 = '' OR business_name ILIKE $2 OR contact_name ILIKE $2
+          OR phone ILIKE $2 OR COALESCE(gstin,'') ILIKE $2
+          OR COALESCE(billing_address,'') ILIKE $2
+       ORDER BY business_name ASC LIMIT 100`,
+      [search, `%${search.replace(/[\\%_]/g, '\\$&')}%`],
+    );
+    res.json({ data: r.rows });
+  } catch (e) { console.error('Vendor lookup failed:', e); res.status(500).json({ error: 'Unable to load vendors.' }); }
+});
+
+app.post('/api/vendors', requireSupabaseUser, async (req, res) => {
+  const user = res.locals.authenticatedUser as AuthenticatedUser;
+  const b = req.body as Record<string, unknown>;
+  const businessName = typeof b.businessName === 'string' ? b.businessName.trim() : '';
+  const contactName  = typeof b.contactName  === 'string' ? b.contactName.trim()  : '';
+  const phone        = typeof b.phone        === 'string' ? b.phone.trim()        : '';
+  const gstin        = typeof b.gstin        === 'string' ? b.gstin.trim().toUpperCase() : '';
+  const billingAddress = typeof b.billingAddress === 'string' ? b.billingAddress.trim() : '';
+  const state        = typeof b.state        === 'string' ? b.state.trim()        : '';
+  const vendorType   = ['Manufacturer','Distributor','Supplier','Other'].includes(String(b.vendorType)) ? String(b.vendorType) : 'Supplier';
+  if (!businessName || !contactName || !phone || businessName.length > 200 || contactName.length > 200 || phone.length > 40 || gstin.length > 15) { res.status(400).json({ error: 'Enter a valid business name, contact name and phone number.' }); return; }
+  if (gstin && !/^[0-9A-Z]{15}$/.test(gstin)) { res.status(400).json({ error: 'GSTIN must be 15 alphanumeric characters.' }); return; }
+  try {
+    const dup = await pool.query(`SELECT id FROM public.vendors WHERE (phone=$1 AND lower(business_name)=lower($2)) OR ($3<>'' AND gstin=$3) LIMIT 1`, [phone, businessName, gstin]);
+    if (dup.rowCount) { res.status(409).json({ error: 'A vendor with this business name and phone, or this GSTIN, already exists.' }); return; }
+    const r = await pool.query(
+      `INSERT INTO public.vendors(business_name,contact_name,phone,gstin,billing_address,state,vendor_type,created_by) VALUES($1,$2,$3,NULLIF($4,''),NULLIF($5,''),NULLIF($6,''),$7,$8)
+       RETURNING id, business_name AS "businessName", contact_name AS "contactName", phone, gstin, billing_address AS "billingAddress", state, vendor_type AS "vendorType"`,
+      [businessName, contactName, phone, gstin, billingAddress, state, vendorType, user.id],
+    );
+    res.status(201).json({ success: true, vendor: r.rows[0] });
+  } catch (e) { console.error('Vendor create failed:', e); res.status(500).json({ error: 'Unable to save vendor.' }); }
+});
+
+app.patch('/api/vendors/:id', requireSupabaseUser, async (req, res) => {
+  const id = validCustomerId(req.params.id);
+  if (!id) { res.status(400).json({ error: 'Invalid vendor ID.' }); return; }
+  const b = req.body as Record<string, unknown>;
+  const businessName = typeof b.businessName === 'string' ? b.businessName.trim() : '';
+  const contactName  = typeof b.contactName  === 'string' ? b.contactName.trim()  : '';
+  const phone        = typeof b.phone        === 'string' ? b.phone.trim()        : '';
+  const gstin        = typeof b.gstin        === 'string' ? b.gstin.trim().toUpperCase() : '';
+  const billingAddress = typeof b.billingAddress === 'string' ? b.billingAddress.trim() : '';
+  const state        = typeof b.state        === 'string' ? b.state.trim()        : '';
+  const vendorType   = ['Manufacturer','Distributor','Supplier','Other'].includes(String(b.vendorType)) ? String(b.vendorType) : 'Supplier';
+  if (!businessName || !contactName || !phone) { res.status(400).json({ error: 'Business name, contact name and phone are required.' }); return; }
+  if (gstin && !/^[0-9A-Z]{15}$/.test(gstin)) { res.status(400).json({ error: 'GSTIN must be 15 alphanumeric characters.' }); return; }
+  try {
+    const r = await pool.query(
+      `UPDATE public.vendors SET business_name=$2,contact_name=$3,phone=$4,gstin=NULLIF($5,''),billing_address=NULLIF($6,''),state=NULLIF($7,''),vendor_type=$8,updated_at=NOW() WHERE id=$1
+       RETURNING id, business_name AS "businessName", contact_name AS "contactName", phone, gstin, billing_address AS "billingAddress", state, vendor_type AS "vendorType"`,
+      [id, businessName, contactName, phone, gstin, billingAddress, state, vendorType],
+    );
+    if (!r.rowCount) { res.status(404).json({ error: 'Vendor not found.' }); return; }
+    res.json({ success: true, vendor: r.rows[0] });
+  } catch (e) { console.error('Vendor update failed:', e); res.status(500).json({ error: 'Unable to update vendor.' }); }
+});
+
+// Purchase Orders
+app.get('/api/purchase/orders', requireSupabaseUser, async (req, res) => {
+  const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
+  try {
+    const r = await pool.query(
+      `SELECT id, order_number AS "orderNumber", vendor_snapshot AS vendor, items,
+              subtotal, discount_total AS "discountTotal", taxable_value AS "taxableValue",
+              tax_total AS "taxTotal", grand_total AS "grandTotal",
+              status, order_date AS "orderDate", expected_delivery AS "expectedDelivery", notes, created_at AS "createdAt"
+       FROM public.purchase_orders
+       WHERE $1='' OR order_number ILIKE $2 OR vendor_snapshot->>'businessName' ILIKE $2
+       ORDER BY created_at DESC LIMIT 200`,
+      [search, `%${search.replace(/[\\%_]/g, '\\$&')}%`],
+    );
+    res.json({ data: r.rows });
+  } catch (e) { console.error('Purchase orders lookup failed:', e); res.status(500).json({ error: 'Unable to load purchase orders.' }); }
+});
+
+app.post('/api/purchase/orders', requireSupabaseUser, async (req, res) => {
+  const user = res.locals.authenticatedUser as AuthenticatedUser;
+  const b = req.body as Record<string, unknown>;
+  const vendor = b.vendor && typeof b.vendor === 'object' ? vendorSnapshot(b.vendor as Record<string, unknown>) : null;
+  const totals = buildSalesLines(b.items);
+  const orderNumber = typeof b.orderNumber === 'string' ? b.orderNumber.trim().slice(0, 80) : '';
+  const vendorId = validCustomerId(vendor?.id);
+  if (!orderNumber || !vendor?.businessName || !vendorId || !totals) { res.status(400).json({ error: 'Provide order number, saved vendor and valid items.' }); return; }
+  try {
+    const r = await pool.query(
+      `INSERT INTO public.purchase_orders(order_number,vendor_id,vendor_snapshot,items,subtotal,discount_total,taxable_value,tax_total,grand_total,status,order_date,expected_delivery,notes,created_by)
+       VALUES($1,$2,$3::jsonb,$4::jsonb,$5,$6,$7,$8,$9,'Draft',CURRENT_DATE,NULLIF($10::text,'')::date,NULLIF($11,''),$12)
+       RETURNING id, order_number AS "orderNumber", status, created_at AS "createdAt"`,
+      [orderNumber, vendorId, JSON.stringify(vendor), JSON.stringify(totals.lines),
+       totals.subtotal, totals.discountTotal, totals.taxableValue, totals.taxTotal, totals.grandTotal,
+       typeof b.expectedDelivery === 'string' ? b.expectedDelivery : '',
+       typeof b.notes === 'string' ? b.notes.slice(0, 2000) : '', user.id],
+    );
+    res.status(201).json({ success: true, order: r.rows[0] });
+  } catch (e) { const pe = e as { code?: string }; if (pe.code === '23505') { res.status(409).json({ error: 'Order number already exists.' }); return; } console.error('Purchase order create failed:', e); res.status(500).json({ error: 'Unable to save purchase order.' }); }
+});
+
+app.put('/api/purchase/orders/:id', requireSupabaseUser, async (req, res) => {
+  const id = validCustomerId(req.params.id);
+  if (!id) { res.status(400).json({ error: 'Invalid order ID.' }); return; }
+  const b = req.body as Record<string, unknown>;
+  const vendor = b.vendor && typeof b.vendor === 'object' ? vendorSnapshot(b.vendor as Record<string, unknown>) : null;
+  const totals = buildSalesLines(b.items);
+  const orderNumber = typeof b.orderNumber === 'string' ? b.orderNumber.trim().slice(0, 80) : '';
+  const vendorId = validCustomerId(vendor?.id);
+  if (!orderNumber || !vendor?.businessName || !vendorId || !totals) { res.status(400).json({ error: 'Provide order number, saved vendor and valid items.' }); return; }
+  try {
+    const r = await pool.query(
+      `UPDATE public.purchase_orders SET order_number=$2,vendor_id=$3,vendor_snapshot=$4::jsonb,items=$5::jsonb,
+       subtotal=$6,discount_total=$7,taxable_value=$8,tax_total=$9,grand_total=$10,
+       expected_delivery=NULLIF($11::text,'')::date,notes=NULLIF($12,''),updated_at=NOW() WHERE id=$1
+       RETURNING id, order_number AS "orderNumber", status`,
+      [id, orderNumber, vendorId, JSON.stringify(vendor), JSON.stringify(totals.lines),
+       totals.subtotal, totals.discountTotal, totals.taxableValue, totals.taxTotal, totals.grandTotal,
+       typeof b.expectedDelivery === 'string' ? b.expectedDelivery : '',
+       typeof b.notes === 'string' ? b.notes.slice(0, 2000) : ''],
+    );
+    if (!r.rowCount) { res.status(404).json({ error: 'Purchase order not found.' }); return; }
+    res.json({ success: true, order: r.rows[0] });
+  } catch (e) { console.error('Purchase order update failed:', e); res.status(500).json({ error: 'Unable to update purchase order.' }); }
+});
+
+// Purchase Invoices
+app.get('/api/purchase/invoices', requireSupabaseUser, async (req, res) => {
+  const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
+  try {
+    const r = await pool.query(
+      `SELECT id, invoice_number AS "invoiceNumber", vendor_snapshot AS vendor, items,
+              subtotal, discount_total AS "discountTotal", taxable_value AS "taxableValue",
+              tax_total AS "taxTotal", grand_total AS "grandTotal",
+              status, invoice_date AS "invoiceDate", due_date AS "dueDate", notes, created_at AS "createdAt"
+       FROM public.purchase_invoices
+       WHERE $1='' OR invoice_number ILIKE $2 OR vendor_snapshot->>'businessName' ILIKE $2
+       ORDER BY created_at DESC LIMIT 200`,
+      [search, `%${search.replace(/[\\%_]/g, '\\$&')}%`],
+    );
+    res.json({ data: r.rows });
+  } catch (e) { console.error('Purchase invoices lookup failed:', e); res.status(500).json({ error: 'Unable to load purchase invoices.' }); }
+});
+
+app.post('/api/purchase/invoices', requireSupabaseUser, async (req, res) => {
+  const user = res.locals.authenticatedUser as AuthenticatedUser;
+  const b = req.body as Record<string, unknown>;
+  const vendor = b.vendor && typeof b.vendor === 'object' ? vendorSnapshot(b.vendor as Record<string, unknown>) : null;
+  const totals = buildSalesLines(b.items);
+  const invoiceNumber = typeof b.invoiceNumber === 'string' ? b.invoiceNumber.trim().slice(0, 80) : '';
+  const vendorId = validCustomerId(vendor?.id);
+  if (!invoiceNumber || !vendor?.businessName || !vendorId || !totals) { res.status(400).json({ error: 'Provide invoice number, saved vendor and valid items.' }); return; }
+  try {
+    const r = await pool.query(
+      `INSERT INTO public.purchase_invoices(invoice_number,vendor_id,vendor_snapshot,items,subtotal,discount_total,taxable_value,tax_total,grand_total,status,invoice_date,due_date,notes,created_by)
+       VALUES($1,$2,$3::jsonb,$4::jsonb,$5,$6,$7,$8,$9,'Draft',COALESCE(NULLIF($10::text,'')::date,CURRENT_DATE),NULLIF($11::text,'')::date,NULLIF($12,''),$13)
+       RETURNING id, invoice_number AS "invoiceNumber", status, created_at AS "createdAt"`,
+      [invoiceNumber, vendorId, JSON.stringify(vendor), JSON.stringify(totals.lines),
+       totals.subtotal, totals.discountTotal, totals.taxableValue, totals.taxTotal, totals.grandTotal,
+       typeof b.invoiceDate === 'string' ? b.invoiceDate : '',
+       typeof b.dueDate === 'string' ? b.dueDate : '',
+       typeof b.notes === 'string' ? b.notes.slice(0, 2000) : '', user.id],
+    );
+    res.status(201).json({ success: true, invoice: r.rows[0] });
+  } catch (e) { const pe = e as { code?: string }; if (pe.code === '23505') { res.status(409).json({ error: 'Invoice number already exists.' }); return; } console.error('Purchase invoice create failed:', e); res.status(500).json({ error: 'Unable to save purchase invoice.' }); }
+});
+
+app.put('/api/purchase/invoices/:id', requireSupabaseUser, async (req, res) => {
+  const id = validCustomerId(req.params.id);
+  if (!id) { res.status(400).json({ error: 'Invalid invoice ID.' }); return; }
+  const b = req.body as Record<string, unknown>;
+  const vendor = b.vendor && typeof b.vendor === 'object' ? vendorSnapshot(b.vendor as Record<string, unknown>) : null;
+  const totals = buildSalesLines(b.items);
+  const invoiceNumber = typeof b.invoiceNumber === 'string' ? b.invoiceNumber.trim().slice(0, 80) : '';
+  const vendorId = validCustomerId(vendor?.id);
+  if (!invoiceNumber || !vendor?.businessName || !vendorId || !totals) { res.status(400).json({ error: 'Provide invoice number, saved vendor and valid items.' }); return; }
+  try {
+    const r = await pool.query(
+      `UPDATE public.purchase_invoices SET invoice_number=$2,vendor_id=$3,vendor_snapshot=$4::jsonb,items=$5::jsonb,
+       subtotal=$6,discount_total=$7,taxable_value=$8,tax_total=$9,grand_total=$10,
+       invoice_date=COALESCE(NULLIF($11::text,'')::date,CURRENT_DATE),due_date=NULLIF($12::text,'')::date,
+       notes=NULLIF($13,''),updated_at=NOW() WHERE id=$1
+       RETURNING id, invoice_number AS "invoiceNumber", status`,
+      [id, invoiceNumber, vendorId, JSON.stringify(vendor), JSON.stringify(totals.lines),
+       totals.subtotal, totals.discountTotal, totals.taxableValue, totals.taxTotal, totals.grandTotal,
+       typeof b.invoiceDate === 'string' ? b.invoiceDate : '',
+       typeof b.dueDate === 'string' ? b.dueDate : '',
+       typeof b.notes === 'string' ? b.notes.slice(0, 2000) : ''],
+    );
+    if (!r.rowCount) { res.status(404).json({ error: 'Purchase invoice not found.' }); return; }
+    res.json({ success: true, invoice: r.rows[0] });
+  } catch (e) { console.error('Purchase invoice update failed:', e); res.status(500).json({ error: 'Unable to update purchase invoice.' }); }
+});
+
+// Debit Notes
+app.get('/api/purchase/debit-notes', requireSupabaseUser, async (req, res) => {
+  const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
+  try {
+    const r = await pool.query(
+      `SELECT id, debit_note_number AS "debitNoteNumber", vendor_snapshot AS vendor, vendor_id AS "vendorId",
+              debit_date AS "debitDate", amount, reason, status, purchase_invoice_id AS "invoiceId",
+              created_at AS "createdAt"
+       FROM public.debit_notes
+       WHERE $1='' OR debit_note_number ILIKE $2 OR vendor_snapshot->>'businessName' ILIKE $2
+       ORDER BY created_at DESC LIMIT 200`,
+      [search, `%${search.replace(/[\\%_]/g, '\\$&')}%`],
+    );
+    res.json({ data: r.rows });
+  } catch (e) { console.error('Debit notes lookup failed:', e); res.status(500).json({ error: 'Unable to load debit notes.' }); }
+});
+
+app.post('/api/purchase/debit-notes', requireSupabaseUser, async (req, res) => {
+  const user = res.locals.authenticatedUser as AuthenticatedUser;
+  const b = req.body as Record<string, unknown>;
+  const number = typeof b.debitNoteNumber === 'string' ? b.debitNoteNumber.trim().slice(0, 80) : '';
+  const vendorId = validCustomerId(b.vendorId);
+  const vendor = b.vendor && typeof b.vendor === 'object' ? vendorSnapshot(b.vendor as Record<string, unknown>) : null;
+  const amount = Number(b.amount);
+  const reason = typeof b.reason === 'string' ? b.reason.trim().slice(0, 2000) : '';
+  const debitDate = typeof b.debitDate === 'string' ? b.debitDate : new Date().toISOString().slice(0, 10);
+  if (!number || !vendorId || !vendor?.businessName || !Number.isFinite(amount) || amount <= 0 || !reason) { res.status(400).json({ error: 'Provide debit note number, saved vendor, positive amount and reason.' }); return; }
+  try {
+    const r = await pool.query(
+      `INSERT INTO public.debit_notes(debit_note_number,vendor_id,vendor_snapshot,purchase_invoice_id,debit_date,amount,reason,created_by)
+       VALUES($1,$2,$3::jsonb,NULLIF($4::text,'')::bigint,$5,$6,$7,$8)
+       RETURNING id, debit_note_number AS "debitNoteNumber", status, created_at AS "createdAt"`,
+      [number, vendorId, JSON.stringify(vendor),
+       typeof b.invoiceId === 'string' ? b.invoiceId : '',
+       debitDate, amount, reason, user.id],
+    );
+    res.status(201).json({ success: true, debitNote: r.rows[0] });
+  } catch (e) { const pe = e as { code?: string }; if (pe.code === '23505') { res.status(409).json({ error: 'Debit note number already exists.' }); return; } console.error('Debit note create failed:', e); res.status(500).json({ error: 'Unable to save debit note.' }); }
+});
+
+app.put('/api/purchase/debit-notes/:id', requireSupabaseUser, async (req, res) => {
+  const id = validCustomerId(req.params.id);
+  if (!id) { res.status(400).json({ error: 'Invalid debit note ID.' }); return; }
+  const b = req.body as Record<string, unknown>;
+  const number = typeof b.debitNoteNumber === 'string' ? b.debitNoteNumber.trim().slice(0, 80) : '';
+  const vendorId = validCustomerId(b.vendorId);
+  const vendor = b.vendor && typeof b.vendor === 'object' ? vendorSnapshot(b.vendor as Record<string, unknown>) : null;
+  const amount = Number(b.amount);
+  const reason = typeof b.reason === 'string' ? b.reason.trim().slice(0, 2000) : '';
+  const debitDate = typeof b.debitDate === 'string' ? b.debitDate : new Date().toISOString().slice(0, 10);
+  if (!number || !vendorId || !vendor?.businessName || !Number.isFinite(amount) || amount <= 0 || !reason) { res.status(400).json({ error: 'Provide debit note number, saved vendor, positive amount and reason.' }); return; }
+  try {
+    const r = await pool.query(
+      `UPDATE public.debit_notes SET debit_note_number=$2,vendor_id=$3,vendor_snapshot=$4::jsonb,
+       purchase_invoice_id=NULLIF($5::text,'')::bigint,debit_date=$6,amount=$7,reason=$8,updated_at=NOW() WHERE id=$1
+       RETURNING id, debit_note_number AS "debitNoteNumber", status`,
+      [id, number, vendorId, JSON.stringify(vendor),
+       typeof b.invoiceId === 'string' ? b.invoiceId : '',
+       debitDate, amount, reason],
+    );
+    if (!r.rowCount) { res.status(404).json({ error: 'Debit note not found.' }); return; }
+    res.json({ success: true, debitNote: r.rows[0] });
+  } catch (e) { console.error('Debit note update failed:', e); res.status(500).json({ error: 'Unable to update debit note.' }); }
+});
+
+app.patch('/api/purchase/debit-notes/:id/status', requireSupabaseUser, async (req, res) => {
+  const id = validCustomerId(req.params.id);
+  const status = String(req.body?.status || '');
+  if (!id || !['Issued','Applied','Void'].includes(status)) { res.status(400).json({ error: 'Valid status is Issued, Applied or Void.' }); return; }
+  try {
+    const r = await pool.query(
+      `UPDATE public.debit_notes SET status=$2,updated_at=NOW() WHERE id=$1 RETURNING id, debit_note_number AS "debitNoteNumber", status`,
+      [id, status],
+    );
+    if (!r.rowCount) { res.status(404).json({ error: 'Debit note not found.' }); return; }
+    res.json({ success: true, debitNote: r.rows[0] });
+  } catch (e) { console.error('Debit note status update failed:', e); res.status(500).json({ error: 'Unable to update debit note status.' }); }
+});
+
+// Purchase summary
+app.get('/api/purchase/summary', requireSupabaseUser, async (req, res) => {
+  const user = res.locals.authenticatedUser as AuthenticatedUser;
+  try {
+    const r = await pool.query(
+      `SELECT
+        (SELECT COUNT(*) FROM public.purchase_orders WHERE created_by=$1)::int AS po_count,
+        (SELECT COALESCE(SUM(grand_total),0) FROM public.purchase_orders WHERE created_by=$1) AS po_value,
+        (SELECT COUNT(*) FROM public.purchase_invoices WHERE created_by=$1)::int AS pi_count,
+        (SELECT COALESCE(SUM(grand_total),0) FROM public.purchase_invoices WHERE created_by=$1) AS pi_value,
+        (SELECT COALESCE(SUM(grand_total),0) FROM public.purchase_invoices WHERE created_by=$1 AND status='Paid') AS paid_value,
+        (SELECT COALESCE(SUM(grand_total),0) FROM public.purchase_invoices WHERE created_by=$1 AND status IN ('Draft','Received','Partially Paid','Overdue')) AS outstanding_value,
+        (SELECT COUNT(*) FROM public.debit_notes WHERE created_by=$1)::int AS dn_count,
+        (SELECT COALESCE(SUM(amount),0) FROM public.debit_notes WHERE created_by=$1) AS dn_total`,
+      [user.id],
+    );
+    const row = r.rows[0] || {};
+    res.json({
+      orders:     { count: row.po_count,  value: row.po_value },
+      invoices:   { count: row.pi_count,  value: row.pi_value },
+      payments:   { paid: row.paid_value },
+      outstanding: row.outstanding_value,
+      debitNotes: { count: row.dn_count,  total: row.dn_total },
+    });
+  } catch (e) { console.error('Purchase summary failed:', e); res.status(500).json({ error: 'Unable to load purchase summary.' }); }
+});
+
+// -----------------------------------------------------------------------------
 // Start server and handle shutdown
 // -----------------------------------------------------------------------------
 

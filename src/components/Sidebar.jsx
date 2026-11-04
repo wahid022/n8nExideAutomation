@@ -17,6 +17,7 @@ const ICON_PATHS = {
   reports: <><path d="M4 20V4M4 20h17" /><rect x="7" y="12" width="3" height="6" /><rect x="13" y="8" width="3" height="10" /><rect x="19" y="5" width="2" height="13" /></>,
   tax: <><path d="m12 2 9 5v10l-9 5-9-5V7z" /><path d="M8 9h8M8 13h8M8 17h4" /></>,
   accounting: <><path d="M5 3h14v18H5z" /><path d="M8 7h8M8 11h8M8 15h8" /></>,
+  purchaseDashboard: <><path d="M3 3v18h18" /><path d="M7 14l3-4 3 2 4-6" /><path d="M5 7h3M5 11h3" /></>,
   purchaseInvoice: <><path d="M5 2h10l4 4v16H5z" /><path d="M15 2v5h4M8 11h8M8 15h8M8 18h4" /></>,
   purchaseOrder: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 8h10M7 12h6M7 16h8" /></>,
   debitNote: <><path d="M4 4h16v16H4z" /><path d="M8 8h8M8 12h5" /><path d="M16 15h-5m2-2-2 2 2 2" /></>,
@@ -102,10 +103,11 @@ const NAV_GROUPS = [
     title: "Purchase",
     icon: "purchase",
     items: [
-      { label: "Purchase Invoice", icon: "purchaseInvoice" },
-      { label: "Purchase Order", icon: "purchaseOrder" },
-      { label: "Debit Notes", icon: "debitNote" },
-      { label: "Vendor List", icon: "vendor" },
+      { label: "Purchase Dashboard", icon: "purchaseDashboard", path: "/purchase" },
+      { label: "Purchase Invoice",   icon: "purchaseInvoice",   path: "/purchase/invoices" },
+      { label: "Purchase Order",     icon: "purchaseOrder",     path: "/purchase/orders" },
+      { label: "Debit Notes",        icon: "debitNote",         path: "/purchase/debit-notes" },
+      { label: "Vendor List",        icon: "vendor",            path: "/purchase/vendors" },
     ],
   },
   {
@@ -143,7 +145,15 @@ export default function Sidebar({ activePage }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [expanded, setExpanded] = useState({ Sales: true });
+  const [expanded, setExpanded] = useState(() => {
+    const init = { Sales: true };
+    NAV_GROUPS.forEach((group) => {
+      if (group.items.some((item) => item.path && location.pathname === item.path)) {
+        init[group.title] = true;
+      }
+    });
+    return init;
+  });
 
   const toggle = (title) =>
     setExpanded((old) => ({ ...old, [title]: !old[title] }));

@@ -8,6 +8,10 @@ import Customers from "./pages/Customers";
 import Sales from "./pages/Sales";
 import SalesOperations from "./pages/SalesOperations";
 import PaymentEntry from "./pages/PaymentEntry";
+import Purchase from "./pages/Purchase";
+import PurchaseDashboard from "./pages/PurchaseDashboard";
+import PurchaseOperations from "./pages/PurchaseOperations";
+import Vendors from "./pages/Vendors";
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -93,6 +97,36 @@ export default function App() {
               <Route
                 path="/accounting/payment-entry"
                 element={<PaymentEntry activePage="Payment Entry" />}
+              />
+
+              {/* Purchase Dashboard */}
+              <Route
+                path="/purchase"
+                element={<PurchaseDashboard activePage="Purchase Dashboard" />}
+              />
+
+              {/* Purchase Invoice */}
+              <Route
+                path="/purchase/invoices"
+                element={<Purchase activePage="Purchase Invoice" />}
+              />
+
+              {/* Purchase Order */}
+              <Route
+                path="/purchase/orders"
+                element={<Purchase activePage="Purchase Order" />}
+              />
+
+              {/* Debit Notes */}
+              <Route
+                path="/purchase/debit-notes"
+                element={<PurchaseOperations activePage="Debit Notes" />}
+              />
+
+              {/* Vendor List */}
+              <Route
+                path="/purchase/vendors"
+                element={<Vendors activePage="Vendor List" />}
               />
             </Route>
 
