@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { api } from "../lib/api";
@@ -170,6 +170,7 @@ export default function Sales({ activePage = "Sales" }) {
   }, [activePage]);
   useEffect(() => { if (location.state?.salesTab) setTab(location.state.salesTab); }, [location.state?.salesTab]);
 
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 200);
@@ -362,71 +363,11 @@ export default function Sales({ activePage = "Sales" }) {
 
 
   const openEditOrder = (order) => {
-    if (order.status !== "Draft") {
-      setError("Only Draft sales orders can be edited.");
-      return;
-    }
-
-    setError("");
-    setNotice("");
-    const legacyItems = Array.isArray(order.items) ? order.items : [];
-    const items = legacyItems.length
-      ? legacyItems.map((item) => ({
-        ...emptyLine(),
-        ...item,
-        quantity: item.quantity ?? 1,
-        unitPrice: item.unitPrice ?? item.dealerPrice ?? 0,
-        discountPercent: item.discountPercent ?? 0,
-        taxPercent: item.taxPercent ?? 18,
-      }))
-      : [emptyLine()];
-
-    setEditingOrder(order);
-    setForm({
-      documentNumber: order.orderNumber || "",
-      customerId: String(order.customer?.id || ""),
-      invoiceId: "",
-      date: String(order.orderDate || order.createdAt || today()).slice(0, 10),
-      dueDate: "",
-      amount: "",
-      paymentMethod: "UPI",
-      referenceNumber: "",
-      notes: order.notes || "",
-      items,
-    });
-    setViewOrder(null);
-    setModal(true);
+    navigate(`/sales/orders/${order.id}/edit`, { state: { doc: order } });
   };
 
   const openEditInvoice = (invoice) => {
-    setError("");
-    setNotice("");
-    const legacyItems = Array.isArray(invoice.items) ? invoice.items : [];
-    const items = legacyItems.length
-      ? legacyItems.map((item) => ({
-          ...emptyLine(),
-          ...item,
-          quantity: item.quantity ?? 1,
-          unitPrice: item.unitPrice ?? item.dealerPrice ?? 0,
-          discountPercent: item.discountPercent ?? 0,
-          taxPercent: item.taxPercent ?? 18,
-        }))
-      : [emptyLine()];
-
-    setEditingInvoice(invoice);
-    setForm({
-      documentNumber: invoice.invoiceNumber || "",
-      customerId: String(invoice.customer?.id || ""),
-      invoiceId: "",
-      date: String(invoice.invoiceDate || today()).slice(0, 10),
-      dueDate: String(invoice.dueDate || "").slice(0, 10),
-      amount: "",
-      paymentMethod: "UPI",
-      referenceNumber: "",
-      notes: invoice.notes || "",
-      items,
-    });
-    setModal(true);
+    navigate(`/sales/invoices/${invoice.id}/edit`, { state: { doc: invoice } });
   };
 
 
@@ -619,7 +560,7 @@ export default function Sales({ activePage = "Sales" }) {
 
 
 
-            <button className="sales-primary" onClick={openCreate}>
+            <button className="sales-primary" onClick={() => navigate(tab === "Orders" ? "/sales/orders/new" : "/sales/invoices/new")}>
 
               ＋ New {tab === "Orders" ? "order" : "invoice"}
 

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { api } from "../lib/api";
@@ -77,6 +78,7 @@ function PurchaseDocModal({ doc, isInvoice, onClose, autoPrint = false }) {
 export default function Purchase({ activePage }) {
   const isInvoice = activePage === "Purchase Invoice";
 
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 200);
@@ -175,7 +177,7 @@ export default function Purchase({ activePage }) {
               <h1>{activePage}</h1>
               <p>{isInvoice ? "Track purchase invoices received from vendors." : "Create and manage purchase orders sent to vendors."}</p>
             </div>
-            <button className="purchase-primary" onClick={open}>＋ New {isInvoice ? "invoice" : "order"}</button>
+            <button className="purchase-primary" onClick={() => navigate(isInvoice ? "/purchase/invoices/new" : "/purchase/orders/new")}>＋ New {isInvoice ? "invoice" : "order"}</button>
           </div>
 
           {notice && <div className="purchase-notice">{notice}</div>}
@@ -240,7 +242,7 @@ export default function Purchase({ activePage }) {
                         <td>
                           <div className="pur-action-group">
                             {r.status === "Draft" && (
-                              <button className="si-action-btn si-action-btn--edit" onClick={() => openEdit(r)}>
+                              <button className="si-action-btn si-action-btn--edit" onClick={() => navigate(`${isInvoice ? "/purchase/invoices" : "/purchase/orders"}/${r.id}/edit`, { state: { doc: r } })}>
                                 <svg viewBox="0 0 14 14" fill="none" width="12" height="12" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2.5l2 2-6 6H3.5v-2l6-6z" stroke="currentColor"/><path d="M8 4l2 2" stroke="currentColor"/></svg>
                                 Edit
                               </button>

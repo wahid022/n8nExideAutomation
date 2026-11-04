@@ -17,6 +17,7 @@ const PurchaseDashboard = lazy(() => import("./pages/PurchaseDashboard"));
 const PurchaseOperations= lazy(() => import("./pages/PurchaseOperations"));
 const Vendors           = lazy(() => import("./pages/Vendors"));
 const Reports           = lazy(() => import("./pages/Reports"));
+const DocumentPage      = lazy(() => import("./pages/DocumentPage"));
 const Login             = lazy(() => import("./pages/Login"));
 
 export default function App() {
@@ -32,8 +33,12 @@ export default function App() {
                 <Route path="/dashboard" element={<Dashboard activePage="Dashboard" onNavigate={() => {}} />} />
 
                 <Route path="/sales"           element={<SalesDashboard activePage="Sales Dashboard" />} />
-                <Route path="/sales/invoices"  element={<Sales activePage="Sales Invoice" />} />
-                <Route path="/sales/orders"    element={<Sales activePage="Sales Order" />} />
+                <Route path="/sales/invoices/new"       element={<DocumentPage docType="sales-invoice" />} />
+                <Route path="/sales/invoices/:id/edit" element={<DocumentPage docType="sales-invoice" />} />
+                <Route path="/sales/invoices"          element={<Sales activePage="Sales Invoice" />} />
+                <Route path="/sales/orders/new"        element={<DocumentPage docType="sales-order" />} />
+                <Route path="/sales/orders/:id/edit"   element={<DocumentPage docType="sales-order" />} />
+                <Route path="/sales/orders"            element={<Sales activePage="Sales Order" />} />
                 <Route path="sales/quotation"  element={<Quotation activePage="Quotation" onNavigate={() => {}} />} />
                 <Route path="sales/customers"  element={<Customers activePage="Customers" />} />
 
@@ -44,8 +49,12 @@ export default function App() {
                 <Route path="/accounting/payment-entry" element={<PaymentEntry activePage="Payment Entry" />} />
 
                 <Route path="/purchase"           element={<PurchaseDashboard activePage="Purchase Dashboard" />} />
-                <Route path="/purchase/invoices"  element={<Purchase activePage="Purchase Invoice" />} />
-                <Route path="/purchase/orders"    element={<Purchase activePage="Purchase Order" />} />
+                <Route path="/purchase/invoices/new"       element={<DocumentPage docType="purchase-invoice" />} />
+                <Route path="/purchase/invoices/:id/edit" element={<DocumentPage docType="purchase-invoice" />} />
+                <Route path="/purchase/invoices"          element={<Purchase activePage="Purchase Invoice" />} />
+                <Route path="/purchase/orders/new"        element={<DocumentPage docType="purchase-order" />} />
+                <Route path="/purchase/orders/:id/edit"   element={<DocumentPage docType="purchase-order" />} />
+                <Route path="/purchase/orders"            element={<Purchase activePage="Purchase Order" />} />
                 <Route path="/purchase/debit-notes" element={<PurchaseOperations activePage="Debit Notes" />} />
                 <Route path="/purchase/vendors"   element={<Vendors activePage="Vendor List" />} />
 
