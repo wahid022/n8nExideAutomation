@@ -2,34 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { supabase } from "../lib/supabase";
+import { api } from "../lib/api";
+import { moneyCompact } from "../lib/formatters";
+import DonutChart from "../components/DonutChart";
 import "./Purchase.css";
 import "./SalesDashboard.css";
-
-const API_BASE = (
-  import.meta.env.VITE_PRODUCTS_API_URL ||
-  "http://127.0.0.1:3001/api/products"
-).replace(/\/products\/?$/, "");
-
-const money = (v) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(Number(v || 0));
-
-async function api(path) {
-  const { data: { session }, error } = await supabase.auth.getSession();
-  if (error || !session?.access_token)
-    throw new Error("Your session has expired. Please sign in again.");
-  const r = await fetch(`${API_BASE}${path}`, {
-    headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
-    cache: "no-store",
-  });
-  const body = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(body.error || `Request failed (${r.status}).`);
-  return body;
-}
 
 const PO_STATUS_COLOR = {
   Draft:               "#94a3b8",
@@ -39,50 +16,6 @@ const PO_STATUS_COLOR = {
   Received:            "#16a34a",
   Cancelled:           "#ef4444",
 };
-
-function DonutChart({ segments, size = 160, thickness = 26 }) {
-  const r = (size / 2) - (thickness / 2);
-  const C = 2 * Math.PI * r;
-  const cx = size / 2;
-  const cy = size / 2;
-  const total = segments.reduce((s, seg) => s + seg.value, 0);
-
-  if (!total) {
-    return (
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#E2E8F0" strokeWidth={thickness} />
-        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize="13" fill="#94A3B8">No data</text>
-      </svg>
-    );
-  }
-
-  let cumPct = 0;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#F1F5F9" strokeWidth={thickness} />
-      {segments.map((seg, i) => {
-        const pct = seg.value / total;
-        const dash = pct * C;
-        const dashOffset = C * (1 - cumPct);
-        cumPct += pct;
-        return (
-          <circle
-            key={i}
-            cx={cx} cy={cy} r={r}
-            fill="none"
-            stroke={seg.color}
-            strokeWidth={thickness - 3}
-            strokeDasharray={`${dash} ${C - dash}`}
-            strokeDashoffset={dashOffset}
-            style={{ transform: "rotate(-90deg)", transformOrigin: `${cx}px ${cy}px` }}
-          />
-        );
-      })}
-      <text x={cx} y={cy - 7} textAnchor="middle" fontSize="24" fontWeight="800" fill="#0F172A">{total}</text>
-      <text x={cx} y={cy + 12} textAnchor="middle" fontSize="10" fill="#64748B" letterSpacing="0.5">POs</text>
-    </svg>
-  );
-}
 
 function IconOrders() {
   return (
@@ -147,6 +80,7 @@ export default function PurchaseDashboard({ activePage = "Purchase Dashboard" })
     label: status,
     value: count,
     color: PO_STATUS_COLOR[status] || "#94a3b8",
+    unit: "POs",
   }));
 
   const invoiceValue = Number(summary?.invoices?.value || 0);
@@ -194,7 +128,7 @@ export default function PurchaseDashboard({ activePage = "Purchase Dashboard" })
                 <div className="sd-kpi-icon"><IconOrders /></div>
               </div>
               <strong className="sd-kpi-value">{loading ? "—" : (summary?.orders?.count ?? "0")}</strong>
-              <small className="sd-kpi-sub">{money(summary?.orders?.value)} total value</small>
+              <small className="sd-kpi-sub">{moneyCompact(summary?.orders?.value)} total value</small>
             </div>
 
             <div className="sd-kpi sd-kpi--green">
@@ -203,7 +137,7 @@ export default function PurchaseDashboard({ activePage = "Purchase Dashboard" })
                 <div className="sd-kpi-icon"><IconInvoice /></div>
               </div>
               <strong className="sd-kpi-value">{loading ? "—" : (summary?.invoices?.count ?? "0")}</strong>
-              <small className="sd-kpi-sub">{money(invoiceValue)} invoice value</small>
+              <small className="sd-kpi-sub">{moneyCompact(invoiceValue)} invoice value</small>
             </div>
 
             <div className="sd-kpi sd-kpi--indigo">
@@ -211,7 +145,7 @@ export default function PurchaseDashboard({ activePage = "Purchase Dashboard" })
                 <span className="sd-kpi-label">Total Paid</span>
                 <div className="sd-kpi-icon"><IconPayment /></div>
               </div>
-              <strong className="sd-kpi-value">{loading ? "—" : money(paid)}</strong>
+              <strong className="sd-kpi-value">{loading ? "—" : moneyCompact(paid)}</strong>
               <small className="sd-kpi-sub">Payments made to vendors</small>
             </div>
 
@@ -220,7 +154,7 @@ export default function PurchaseDashboard({ activePage = "Purchase Dashboard" })
                 <span className="sd-kpi-label">Outstanding</span>
                 <div className="sd-kpi-icon"><IconAlert /></div>
               </div>
-              <strong className="sd-kpi-value">{loading ? "—" : money(outstanding)}</strong>
+              <strong className="sd-kpi-value">{loading ? "—" : moneyCompact(outstanding)}</strong>
               <small className="sd-kpi-sub">Unpaid invoice balance</small>
             </div>
           </div>
@@ -272,11 +206,11 @@ export default function PurchaseDashboard({ activePage = "Purchase Dashboard" })
                 <div className="sd-gauge-pills">
                   <div className="sd-gauge-pill sd-gauge-pill--green">
                     <span>Paid</span>
-                    <strong>{money(paid)}</strong>
+                    <strong>{moneyCompact(paid)}</strong>
                   </div>
                   <div className="sd-gauge-pill sd-gauge-pill--red">
                     <span>Outstanding</span>
-                    <strong>{money(outstanding)}</strong>
+                    <strong>{moneyCompact(outstanding)}</strong>
                   </div>
                 </div>
               </div>
@@ -336,7 +270,7 @@ export default function PurchaseDashboard({ activePage = "Purchase Dashboard" })
             <div className="sd-card sd-revenue-card">
               <div className="sd-card-header">
                 <h2>Spend by Order Status</h2>
-                <span className="sd-revenue-total">{money(totalOrderValue)} total</span>
+                <span className="sd-revenue-total">{moneyCompact(totalOrderValue)} total</span>
               </div>
               <div className="sd-revenue-body">
                 <div className="sd-stacked-bar">
@@ -348,7 +282,7 @@ export default function PurchaseDashboard({ activePage = "Purchase Dashboard" })
                         width: `${(val / totalOrderValue) * 100}%`,
                         background: PO_STATUS_COLOR[status] || "#94a3b8",
                       }}
-                      title={`${status}: ${money(val)}`}
+                      title={`${status}: ${moneyCompact(val)}`}
                     />
                   ))}
                 </div>
@@ -357,7 +291,7 @@ export default function PurchaseDashboard({ activePage = "Purchase Dashboard" })
                     <div key={status} className="sd-stacked-item">
                       <span className="sd-legend-dot" style={{ background: PO_STATUS_COLOR[status] || "#94a3b8" }} />
                       <span>{status}</span>
-                      <strong>{money(val)}</strong>
+                      <strong>{moneyCompact(val)}</strong>
                       <em>{Math.round((val / totalOrderValue) * 100)}%</em>
                     </div>
                   ))}

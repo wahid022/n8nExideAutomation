@@ -1,33 +1,18 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { supabase } from "../lib/supabase";
+import { api } from "../lib/api";
+import { avatarColor } from "../lib/formatters";
+import { useDebounce } from "../hooks/useDebounce";
 import "./Customers.css";
 
-const API_BASE = (import.meta.env.VITE_PRODUCTS_API_URL || "http://127.0.0.1:3001/api/products").replace(/\/products\/?$/, "");
 const EMPTY = { businessName: "", contactName: "", phone: "", gstin: "", billingAddress: "", state: "Jharkhand", customerType: "Retailer" };
-
-const AVATAR_PALETTE = ["#4F46E5","#059669","#DC2626","#D97706","#0EA5E9","#7C3AED","#0D9488","#DB2777"];
-const avatarColor = (name) => AVATAR_PALETTE[(name || "?").charCodeAt(0) % AVATAR_PALETTE.length];
-
-async function api(path, options = {}) {
-  const { data: { session }, error } = await supabase.auth.getSession();
-  if (error || !session?.access_token) throw new Error("Your session has expired. Please sign in again.");
-  const response = await fetch(`${API_BASE}${path}`, { ...options, headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, ...(options.headers || {}) }, cache: "no-store" });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || `Request failed (${response.status}).`);
-  return body;
-}
 
 export default function Customers({ activePage = "Customers" }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 250);
-    return () => clearTimeout(t);
-  }, [search]);
+  const debouncedSearch = useDebounce(search, 250);
 
   const { data: customersRaw, isLoading: loading } = useQuery({
     queryKey: ["customers", debouncedSearch],

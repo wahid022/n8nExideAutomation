@@ -1,69 +1,16 @@
-
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { supabase } from "../lib/supabase";
+import { api } from "../lib/api";
+import { money, today, formatDate, statusClass } from "../lib/formatters";
+import { useDebounce } from "../hooks/useDebounce";
 import "./Sales.css";
-
-const API_BASE = (
-  import.meta.env.VITE_PRODUCTS_API_URL ||
-  "http://127.0.0.1:3001/api/products"
-).replace(/\/products\/?$/, "");
-
-const money = (value) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(Number(value || 0));
-
-const today = () => new Date().toISOString().slice(0, 10);
-
-const formatDate = (value) => (value ? String(value).slice(0, 10) : "—");
-
-const statusClass = (status) =>
-  String(status || "")
-    .toLowerCase()
-    .replaceAll(" ", "-");
-
-async function api(path, options = {}) {
-  const {
-    data: { session },
-    error,
-  } = await supabase.auth.getSession();
-
-  if (error || !session?.access_token) {
-    throw new Error("Your session has expired. Please sign in again.");
-  }
-
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
-      ...(options.headers || {}),
-    },
-    cache: "no-store",
-  });
-
-  const body = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(body.error || `Request failed (${response.status}).`);
-  }
-
-  return body;
-}
 
 export default function PaymentEntry({ activePage = "Payment Entry" }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 200);
-    return () => clearTimeout(t);
-  }, [search]);
+  const debouncedSearch = useDebounce(search, 200);
 
   const { data: paymentsRaw, isLoading: loading } = useQuery({
     queryKey: ["sales-payments", debouncedSearch],

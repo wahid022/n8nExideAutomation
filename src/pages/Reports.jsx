@@ -3,28 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { supabase } from "../lib/supabase";
+import { api } from "../lib/api";
+import { moneyCompact as money, fmtDate } from "../lib/formatters";
+import DonutChart from "../components/DonutChart";
 import "./Sales.css";
 import "./SalesDashboard.css";
 import "./Reports.css";
 
-const API_BASE = (import.meta.env.VITE_PRODUCTS_API_URL || "http://127.0.0.1:3001/api/products").replace(/\/products\/?$/, "");
-
-const money = (v) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Number(v || 0));
-
-const fmtDate = (v) => v ? new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-
 const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const monthLabel = (yyyyMM) => { const [,m] = String(yyyyMM||"").split("-"); return MONTH_SHORT[parseInt(m,10)-1] || yyyyMM; };
-
-async function api(path) {
-  const { data: { session }, error } = await supabase.auth.getSession();
-  if (error || !session?.access_token) throw new Error("Session expired.");
-  const r = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, cache: "no-store" });
-  const body = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(body.error || `Request failed (${r.status}).`);
-  return body;
-}
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -74,35 +61,6 @@ function BarChart({ data = [], bar1Key, bar2Key, bar1Color = "#4f46e5", bar2Colo
   );
 }
 
-function DonutChart({ segments = [], size = 130, thickness = 20, centerLabel }) {
-  const r = size/2 - thickness/2;
-  const C = 2 * Math.PI * r;
-  const cx = size/2; const cy = size/2;
-  const total = segments.reduce((s,seg) => s + seg.value, 0);
-  if (!total) return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#E2E8F0" strokeWidth={thickness}/>
-      <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize="11" fill="#94a3b8">No data</text>
-    </svg>
-  );
-  let cum = 0;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#F1F5F9" strokeWidth={thickness}/>
-      {segments.map((seg, i) => {
-        const pct = seg.value / total;
-        const dash = pct * C;
-        const offset = C * (1 - cum);
-        cum += pct;
-        return <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={seg.color} strokeWidth={thickness-3} strokeDasharray={`${dash} ${C-dash}`} strokeDashoffset={offset} style={{ transform: "rotate(-90deg)", transformOrigin: `${cx}px ${cy}px` }}><title>{seg.label}: {money(seg.value)} ({seg.pct||0}%)</title></circle>;
-      })}
-      {centerLabel && <>
-        <text x={cx} y={cy-6} textAnchor="middle" fontSize="13" fontWeight="800" fill="#0F172A">{centerLabel.top}</text>
-        <text x={cx} y={cy+10} textAnchor="middle" fontSize="8.5" fill="#64748B">{centerLabel.bottom}</text>
-      </>}
-    </svg>
-  );
-}
 
 function Loading() { return <div className="rpt-loading"><div className="rpt-spinner"/><span>Loading report…</span></div>; }
 function ErrorMsg({ msg }) { return <div className="sales-error" style={{ margin: "20px 0" }}>{msg || "Failed to load report."}</div>; }

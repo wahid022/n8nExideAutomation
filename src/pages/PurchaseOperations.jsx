@@ -1,31 +1,13 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { supabase } from "../lib/supabase";
+import { api } from "../lib/api";
+import { money, today, fmtDate, avatarColor } from "../lib/formatters";
+import { useDebounce } from "../hooks/useDebounce";
+import { useAutoPrint } from "../hooks/useAutoPrint";
 import "./Purchase.css";
 import "./Sales.css";
-
-const API_BASE = (import.meta.env.VITE_PRODUCTS_API_URL || "http://127.0.0.1:3001/api/products").replace(/\/products\/?$/, "");
-
-const today = () => new Date().toISOString().slice(0, 10);
-const money = (n) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(n || 0));
-
-async function api(path, options = {}) {
-  const { data: { session }, error } = await supabase.auth.getSession();
-  if (error || !session?.access_token) throw new Error("Session expired. Please sign in again.");
-  const r = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, ...(options.headers || {}) },
-  });
-  const body = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(body.error || `Request failed (${r.status}).`);
-  return body;
-}
-
-const AVATAR_COLORS = ["#059669","#0EA5E9","#8B5CF6","#F59E0B","#EF4444","#EC4899","#06B6D4","#4F46E5"];
-const avatarColor = (name) => AVATAR_COLORS[(name || "?").charCodeAt(0) % AVATAR_COLORS.length];
-const fmtDate = (v) => v ? new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
 function badgeClass(status) {
   const s = String(status || "").toLowerCase().replace(/ /g, "-");
@@ -33,12 +15,7 @@ function badgeClass(status) {
 }
 
 function DebitNoteModal({ dn, onClose, autoPrint = false }) {
-  useEffect(() => {
-    if (autoPrint && dn) {
-      const t = setTimeout(() => window.print(), 400);
-      return () => clearTimeout(t);
-    }
-  }, [autoPrint, dn]);
+  useAutoPrint(autoPrint && !!dn);
 
   if (!dn) return null;
   const vendor = dn.vendor || {};
@@ -145,11 +122,7 @@ function DebitNoteModal({ dn, onClose, autoPrint = false }) {
 export default function PurchaseOperations({ activePage = "Debit Notes" }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 200);
-    return () => clearTimeout(t);
-  }, [search]);
+  const debouncedSearch = useDebounce(search, 200);
 
   const { data: vendorsRaw } = useQuery({ queryKey: ["vendors"], queryFn: () => api("/vendors"), staleTime: 60_000 });
   const { data: rowsRaw, isLoading: loading } = useQuery({

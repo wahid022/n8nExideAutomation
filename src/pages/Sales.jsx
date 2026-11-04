@@ -1,119 +1,15 @@
-
-
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
-
 import Sidebar from "../components/Sidebar";
-
 import Topbar from "../components/Topbar";
-
-import { supabase } from "../lib/supabase";
-
+import { api } from "../lib/api";
+import { money, today, formatDate, statusClass } from "../lib/formatters";
+import { useDebounce } from "../hooks/useDebounce";
+import { useAutoPrint } from "../hooks/useAutoPrint";
+import ProductPicker from "../components/ProductPicker";
+import InvoiceDocument from "../components/InvoiceDocument";
 import "./Sales.css";
-
-
-
-
-const API_BASE = (
-  import.meta.env.VITE_PRODUCTS_API_URL ||
-  "http://127.0.0.1:3001/api/products"
-).replace(/\/products\/?$/, "");
-
-
-
-
-const money = (value) =>
-
-  new Intl.NumberFormat("en-IN", {
-
-    style: "currency",
-
-    currency: "INR",
-
-    maximumFractionDigits: 2,
-
-  }).format(Number(value || 0));
-
-
-
-const today = () => new Date().toISOString().slice(0, 10);
-
-
-
-const formatDate = (value) =>
-
-  value ? String(value).slice(0, 10) : "—";
-
-
-
-const statusClass = (status) =>
-
-  String(status || "")
-
-    .toLowerCase()
-
-    .replaceAll(" ", "-");
-
-
-
-async function api(path, options = {}) {
-
-  const {
-
-    data: { session },
-
-    error,
-
-  } = await supabase.auth.getSession();
-
-
-
-  if (error || !session?.access_token) {
-
-    throw new Error("Your session has expired. Please sign in again.");
-
-  }
-
-
-
-  const response = await fetch(`${API_BASE}${path}`, {
-
-    ...options,
-
-    headers: {
-
-      "Content-Type": "application/json",
-
-      Authorization: `Bearer ${session.access_token}`,
-
-      ...(options.headers || {}),
-
-    },
-
-    cache: "no-store",
-
-  });
-
-
-
-  const body = await response.json().catch(() => ({}));
-
-
-
-  if (!response.ok) {
-
-    throw new Error(body.error || `Request failed (${response.status}).`);
-
-  }
-
-
-
-  return body;
-
-}
-
-
 
 const emptyLine = () => ({
 
@@ -133,421 +29,51 @@ const emptyLine = () => ({
 
 
 
-function ProductPicker({ line, onChange }) {
-
-  const [query, setQuery] = useState(line.productName || "");
-
-  const [results, setResults] = useState([]);
-
-  const [open, setOpen] = useState(false);
-
-  const [loading, setLoading] = useState(false);
-
-
-
-  useEffect(() => {
-
-    if (!open || query.trim().length < 2) {
-
-      setResults([]);
-
-      return;
-
-    }
-
-
-
-    const timer = setTimeout(async () => {
-
-      setLoading(true);
-
-
-
-      try {
-
-        const result = await api(
-
-          `/products?search=${encodeURIComponent(query.trim())}&pageSize=20`
-
-        );
-
-
-
-        setResults(result.data || []);
-
-      } catch (error) {
-
-        console.error("Product search failed:", error);
-
-        setResults([]);
-
-      } finally {
-
-        setLoading(false);
-
-      }
-
-    }, 300);
-
-
-
-    return () => clearTimeout(timer);
-
-  }, [query, open]);
-
-
-
-  const selectProduct = (product) => {
-
-    const name = [
-
-      product.brand,
-
-      product.modelSku,
-
-      product.specsCapacity,
-
-    ]
-
-      .filter(Boolean)
-
-      .join(" ");
-
-
-
-    onChange({
-
-      ...line,
-
-      productId: product.id,
-
-      productName: name || product.productCode,
-
-      productCode: product.productCode || "",
-
-      brand: product.brand || "",
-
-      modelSku: product.modelSku || "",
-
-      mrp: product.mrp ?? null,
-
-      unitPrice: Number(product.dealerPrice ?? 0),
-
-      taxPercent: Number(product.gstRate ?? 18),
-
-    });
-
-
-
-    setQuery(name || product.productCode || "");
-
-    setOpen(false);
-
-  };
-
-
-
-  return (
-
-    <div className="sales-product-picker">
-
-      <input
-
-        required
-
-        maxLength={250}
-
-        value={query}
-
-        placeholder="Search product, SKU or code..."
-
-        onFocus={() => setOpen(true)}
-
-        onChange={(e) => {
-
-          const value = e.target.value;
-
-
-
-          setQuery(value);
-
-          setOpen(true);
-
-
-
-          onChange({
-
-            ...line,
-
-            productId: null,
-
-            productName: value,
-
-            productCode: "",
-
-            brand: "",
-
-            modelSku: "",
-
-            mrp: null,
-
-          });
-
-        }}
-
-      />
-
-
-
-      {line.productCode && (
-
-        <small>
-
-          Code: {line.productCode}
-
-          {line.mrp != null ? ` | MRP: ${money(line.mrp)}` : ""}
-
-        </small>
-
-      )}
-
-
-
-      {open && (
-
-        <div className="sales-product-results">
-
-          {loading && (
-
-            <div className="sales-product-option">Searching...</div>
-
-          )}
-
-
-
-          {!loading && query.trim().length >= 2 && results.length === 0 && (
-
-            <div className="sales-product-option">No products found.</div>
-
-          )}
-
-
-
-          {results.map((product) => (
-
-            <button
-
-              type="button"
-
-              className="sales-product-option"
-
-              key={product.id}
-
-              onClick={() => selectProduct(product)}
-
-            >
-
-              <strong>
-
-                {[
-
-                  product.brand,
-
-                  product.modelSku,
-
-                  product.specsCapacity,
-
-                ]
-
-                  .filter(Boolean)
-
-                  .join(" ") || product.productCode}
-
-              </strong>
-
-
-
-              <span>
-
-                Code: {product.productCode || "—"} | Dealer:{" "}
-
-                {money(product.dealerPrice)} | MRP: {money(product.mrp)}
-
-              </span>
-
-            </button>
-
-          ))}
-
-        </div>
-
-      )}
-
-    </div>
-
-  );
-
-}
-
-
-
 function OrderDetailsModal({ order, onClose, onEdit, autoPrint = false }) {
-
-  useEffect(() => {
-    if (autoPrint && order) {
-      const timer = setTimeout(() => window.print(), 250);
-      return () => clearTimeout(timer);
-    }
-  }, [autoPrint, order]);
+  useAutoPrint(autoPrint && !!order);
 
   if (!order) return null;
 
-
-
   const customer = order.customer || {};
-
   const items = Array.isArray(order.items) ? order.items : [];
-
-
-
   const subtotal = Number(order.subtotal || 0);
-
   const discount = Number(order.discountTotal || 0);
-
   const taxable = Number(order.taxableValue || 0);
-
   const tax = Number(order.taxTotal || 0);
-
   const total = Number(order.grandTotal || 0);
 
-
-
   return (
-
     <div
-
       className="sales-modal-backdrop"
-
       role="presentation"
-
       onMouseDown={(event) => {
-
         if (event.target === event.currentTarget) onClose();
-
       }}
-
     >
-
       <section
-
         className="sales-modal sales-order-details-modal"
-
         role="dialog"
-
         aria-modal="true"
-
         aria-labelledby="order-details-title"
-
       >
         <div className="sales-print-document">
-          {/* Invoice header: company left, order details right */}
-          <div className="inv-header">
-            <div className="inv-company">
-              <div className="inv-company-name">BHARAT BATTERIES</div>
-              <div className="inv-company-sub">Your Trusted Partner in Power Solutions</div>
-            </div>
-            <div className="inv-meta">
-              <div className="inv-doc-type">SALES ORDER</div>
-              <div className="inv-meta-row"><span>Order No.</span><strong>{order.orderNumber || `#${order.id}`}</strong></div>
-              <div className="inv-meta-row"><span>Date</span><strong>{formatDate(order.orderDate || order.createdAt)}</strong></div>
-              <div className="inv-meta-row"><span>Status</span><strong>{order.status || "Pending"}</strong></div>
-            </div>
-          </div>
-
-          <div className="inv-rule" />
-
-          {/* Bill To */}
-          <div className="inv-bill-section">
-            <div className="inv-section-label">BILL TO</div>
-            <div className="inv-cust-name">{customer.businessName || customer.name || "—"}</div>
-            {customer.contactPerson && <div>{customer.contactPerson}</div>}
-            {(customer.phone || customer.email) && (
-              <div>{customer.phone || ""}{customer.email ? ` · ${customer.email}` : ""}</div>
-            )}
-            {[customer.address, customer.city, customer.state, customer.pincode].filter(Boolean).length > 0 && (
-              <div>{[customer.address, customer.city, customer.state, customer.pincode].filter(Boolean).join(", ")}</div>
-            )}
-            {customer.gstin && <div>GSTIN: {customer.gstin}</div>}
-          </div>
-
-          {/* Items table */}
-          <table className="inv-items">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Product</th>
-                <th>Code</th>
-                <th>Qty</th>
-                <th>Unit Price</th>
-                <th>Discount</th>
-                <th>GST</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, index) => {
-                const q = Number(item.quantity || 0);
-                const p = Number(item.unitPrice ?? item.dealerPrice ?? 0);
-                const d = Number(item.discountPercent || 0);
-                const t = Number(item.taxPercent ?? 18);
-                const gross = q * p;
-                const da = gross * d / 100;
-                const taxableLine = gross - da;
-                const ga = taxableLine * t / 100;
-                return (
-                  <tr key={`${item.productId || item.productCode || index}-${index}`}>
-                    <td>{index + 1}</td>
-                    <td>{item.productName || item.name || "—"}</td>
-                    <td>{item.productCode || "—"}</td>
-                    <td>{q}</td>
-                    <td>{money(p)}</td>
-                    <td>{d > 0 ? `${d}% (${money(da)})` : "—"}</td>
-                    <td>{t}% ({money(ga)})</td>
-                    <td><strong>{money(item.lineTotal ?? taxableLine + ga)}</strong></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          {/* Totals */}
-          <div className="inv-totals">
-            <div className="inv-total-row"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-            <div className="inv-total-row"><span>Discount</span><span>− {money(discount)}</span></div>
-            <div className="inv-total-row"><span>Taxable Value</span><span>{money(taxable)}</span></div>
-            <div className="inv-total-row"><span>GST</span><span>{money(tax)}</span></div>
-            <div className="inv-total-row inv-grand"><span>Grand Total</span><span>{money(total)}</span></div>
-          </div>
-
-          {order.notes && (
-            <div className="inv-notes"><strong>Notes:</strong> {order.notes}</div>
-          )}
-
-          {/* Signatures */}
-          <div className="inv-signatures">
-            <div className="inv-sig-box">
-              <div className="inv-sig-line" />
-              <div>Customer Signature</div>
-            </div>
-            <div className="inv-sig-box">
-              <div className="inv-sig-line" />
-              <div>For BHARAT BATTERIES<br />Authorised Signatory</div>
-            </div>
-          </div>
-
-          <div className="inv-footer-text">Computer-generated sales order. No physical signature required.</div>
+          <InvoiceDocument
+            docType="SALES ORDER"
+            docNumber={order.orderNumber || `#${order.id}`}
+            docDate={order.orderDate || order.createdAt}
+            dateLabel="Date"
+            status={order.status || "Pending"}
+            party={customer}
+            items={items}
+            subtotal={subtotal}
+            discount={discount}
+            taxable={taxable}
+            tax={tax}
+            total={total}
+            notes={order.notes}
+            footerText="Computer-generated sales order. No physical signature required."
+          />
         </div>
-
 
         <header style={{ padding: "8px 12px", minHeight: "auto", borderBottom: "none", justifyContent: "flex-end" }}>
           {order.status === "Draft" && onEdit && (
@@ -556,28 +82,16 @@ function OrderDetailsModal({ order, onClose, onEdit, autoPrint = false }) {
               Edit
             </button>
           )}
-          <button type="button" className="sales-close" onClick={onClose} aria-label="Close order details">×</button>
+          <button type="button" className="sales-secondary" onClick={() => window.print()}>Print</button>
+          <button type="button" className="sales-close" onClick={onClose} aria-label="Close order details">x</button>
         </header>
-
-
-
       </section>
-
     </div>
-
   );
-
 }
 
-
-
 function InvoiceDetailsModal({ invoice, onClose, onEdit, autoPrint = false }) {
-  useEffect(() => {
-    if (autoPrint && invoice) {
-      const timer = setTimeout(() => window.print(), 250);
-      return () => clearTimeout(timer);
-    }
-  }, [autoPrint, invoice]);
+  useAutoPrint(autoPrint && !!invoice);
 
   if (!invoice) return null;
 
@@ -604,86 +118,25 @@ function InvoiceDetailsModal({ invoice, onClose, onEdit, autoPrint = false }) {
         aria-labelledby="invoice-details-title"
       >
         <div className="sales-print-document">
-          <div className="inv-header">
-            <div className="inv-company">
-              <div className="inv-company-name">BHARAT BATTERIES</div>
-              <div className="inv-company-sub">Your Trusted Partner in Power Solutions</div>
-            </div>
-            <div className="inv-meta">
-              <div className="inv-doc-type">TAX INVOICE</div>
-              <div className="inv-meta-row"><span>Invoice No.</span><strong>{invoice.invoiceNumber || `#${invoice.id}`}</strong></div>
-              <div className="inv-meta-row"><span>Invoice Date</span><strong>{formatDate(invoice.invoiceDate)}</strong></div>
-              <div className="inv-meta-row"><span>Due Date</span><strong>{formatDate(invoice.dueDate) || "—"}</strong></div>
-              <div className="inv-meta-row"><span>Status</span><strong>{invoice.status || "Draft"}</strong></div>
-            </div>
-          </div>
-
-          <div className="inv-rule" />
-
-          <div className="inv-bill-section">
-            <div className="inv-section-label">BILL TO</div>
-            <div className="inv-cust-name">{customer.businessName || customer.name || "—"}</div>
-            {customer.contactPerson && <div>{customer.contactPerson}</div>}
-            {(customer.phone || customer.email) && (
-              <div>{customer.phone || ""}{customer.email ? ` · ${customer.email}` : ""}</div>
-            )}
-            {[customer.address, customer.city, customer.state, customer.pincode].filter(Boolean).length > 0 && (
-              <div>{[customer.address, customer.city, customer.state, customer.pincode].filter(Boolean).join(", ")}</div>
-            )}
-            {customer.gstin && <div>GSTIN: {customer.gstin}</div>}
-          </div>
-
-          <table className="inv-items">
-            <thead>
-              <tr>
-                <th>#</th><th>Product</th><th>Code</th><th>Qty</th>
-                <th>Unit Price</th><th>Discount</th><th>GST</th><th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, i) => {
-                const q = Number(item.quantity || 0);
-                const p = Number(item.unitPrice ?? item.dealerPrice ?? 0);
-                const d = Number(item.discountPercent || 0);
-                const t = Number(item.taxPercent ?? 18);
-                const gross = q * p;
-                const da = gross * d / 100;
-                const taxableLine = gross - da;
-                const ga = taxableLine * t / 100;
-                return (
-                  <tr key={i}>
-                    <td>{i + 1}</td>
-                    <td>{item.productName || item.name || "—"}</td>
-                    <td>{item.productCode || "—"}</td>
-                    <td>{q}</td>
-                    <td>{money(p)}</td>
-                    <td>{d > 0 ? `${d}% (${money(da)})` : "—"}</td>
-                    <td>{t}% ({money(ga)})</td>
-                    <td><strong>{money(item.lineTotal ?? taxableLine + ga)}</strong></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          <div className="inv-totals">
-            <div className="inv-total-row"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-            <div className="inv-total-row"><span>Discount</span><span>− {money(discount)}</span></div>
-            <div className="inv-total-row"><span>Taxable Value</span><span>{money(taxable)}</span></div>
-            <div className="inv-total-row"><span>GST</span><span>{money(tax)}</span></div>
-            <div className="inv-total-row inv-grand"><span>Grand Total</span><span>{money(total)}</span></div>
-            {paid > 0 && <div className="inv-total-row"><span>Amount Paid</span><span>− {money(paid)}</span></div>}
-            {paid > 0 && <div className="inv-total-row inv-grand"><span>Balance Due</span><span>{money(balance)}</span></div>}
-          </div>
-
-          {invoice.notes && <div className="inv-notes"><strong>Notes:</strong> {invoice.notes}</div>}
-
-          <div className="inv-signatures">
-            <div className="inv-sig-box"><div className="inv-sig-line" /><div>Customer Signature</div></div>
-            <div className="inv-sig-box"><div className="inv-sig-line" /><div>For BHARAT BATTERIES<br />Authorised Signatory</div></div>
-          </div>
-
-          <div className="inv-footer-text">This is a computer-generated tax invoice. Subject to jurisdiction of local courts.</div>
+          <InvoiceDocument
+            docType="TAX INVOICE"
+            docNumber={invoice.invoiceNumber || `#${invoice.id}`}
+            docDate={invoice.invoiceDate}
+            dateLabel="Invoice Date"
+            extraDate={invoice.dueDate}
+            extraLabel="Due Date"
+            status={invoice.status}
+            party={customer}
+            items={items}
+            subtotal={subtotal}
+            discount={discount}
+            taxable={taxable}
+            tax={tax}
+            total={total}
+            paid={paid}
+            balance={balance}
+            notes={invoice.notes}
+          />
         </div>
 
         <header style={{ padding: "8px 12px", minHeight: "auto", borderBottom: "none", justifyContent: "flex-end" }}>
@@ -693,13 +146,14 @@ function InvoiceDetailsModal({ invoice, onClose, onEdit, autoPrint = false }) {
               Edit
             </button>
           )}
-          <button type="button" className="sales-close" onClick={onClose} aria-label="Close">×</button>
+          <button type="button" className="sales-secondary" onClick={() => window.print()}>Print</button>
+          <button type="button" className="sales-close" onClick={onClose} aria-label="Close">x</button>
         </header>
-
       </section>
     </div>
   );
 }
+
 
 export default function Sales({ activePage = "Sales" }) {
   const location = useLocation();
@@ -717,11 +171,7 @@ export default function Sales({ activePage = "Sales" }) {
 
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 200);
-    return () => clearTimeout(t);
-  }, [search]);
+  const debouncedSearch = useDebounce(search, 200);
 
   const { data: ordersRaw,   isLoading: ordersLoading,   error: ordersErr   } = useQuery({ queryKey: ["sales-orders",   debouncedSearch], queryFn: () => api(`/sales/orders?search=${encodeURIComponent(debouncedSearch)}`),   staleTime: 20_000, placeholderData: keepPreviousData });
   const { data: invoicesRaw, isLoading: invoicesLoading, error: invoicesErr } = useQuery({ queryKey: ["sales-invoices", debouncedSearch], queryFn: () => api(`/sales/invoices?search=${encodeURIComponent(debouncedSearch)}`), staleTime: 20_000, placeholderData: keepPreviousData });

@@ -1,51 +1,12 @@
-
 import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { supabase } from "../lib/supabase";
+import { api } from "../lib/api";
+import { money, today, fmtDate } from "../lib/formatters";
+import { useDebounce } from "../hooks/useDebounce";
+import { useAutoPrint } from "../hooks/useAutoPrint";
 import "./Sales.css";
-
-const API_BASE = (
-  import.meta.env.VITE_PRODUCTS_API_URL ||
-  "http://127.0.0.1:3001/api/products"
-).replace(/\/products\/?$/, "");
-
-const today = () => new Date().toISOString().slice(0, 10);
-
-const money = (n) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-  }).format(Number(n || 0));
-
-async function api(path, options = {}) {
-  const {
-    data: { session },
-    error,
-  } = await supabase.auth.getSession();
-
-  if (error || !session?.access_token) {
-    throw new Error("Session expired. Please sign in again.");
-  }
-
-  const r = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
-      ...(options.headers || {}),
-    },
-  });
-
-  const body = await r.json().catch(() => ({}));
-
-  if (!r.ok) {
-    throw new Error(body.error || `Request failed (${r.status}).`);
-  }
-
-  return body;
-}
 
 const blankItem = () => ({
   productName: "",
@@ -77,11 +38,7 @@ export default function SalesOperations({ activePage }) {
 
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 200);
-    return () => clearTimeout(t);
-  }, [search]);
+  const debouncedSearch = useDebounce(search, 200);
 
   const TAB_PATHS = {
     "Delivery Challans":  "/sales/challans",
@@ -1049,18 +1006,7 @@ export default function SalesOperations({ activePage }) {
 }
 
 function CreditNoteModal({ record, autoPrint, onClose }) {
-  useEffect(() => {
-    if (autoPrint) {
-      const t = setTimeout(() => window.print(), 400);
-      return () => clearTimeout(t);
-    }
-  }, [autoPrint]);
-
-  const money = (n) =>
-    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(n || 0));
-
-  const fmtDate = (v) =>
-    v ? new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }) : "—";
+  useAutoPrint(autoPrint);
 
   const statusColors = {
     Draft:   { bg: "#fef9c3", color: "#854d0e" },

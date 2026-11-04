@@ -1,131 +1,39 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { supabase } from "../lib/supabase";
+import { api } from "../lib/api";
+import { money, today, fmtDate, avatarColor } from "../lib/formatters";
+import { useDebounce } from "../hooks/useDebounce";
+import { useAutoPrint } from "../hooks/useAutoPrint";
+import ProductPicker from "../components/ProductPicker";
+import InvoiceDocument from "../components/InvoiceDocument";
 import "./Purchase.css";
 import "./Sales.css";
 
-const API_BASE = (import.meta.env.VITE_PRODUCTS_API_URL || "http://127.0.0.1:3001/api/products").replace(/\/products\/?$/, "");
-
-const today = () => new Date().toISOString().slice(0, 10);
-const money = (n) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(n || 0));
-
-async function api(path, options = {}) {
-  const { data: { session }, error } = await supabase.auth.getSession();
-  if (error || !session?.access_token) throw new Error("Session expired. Please sign in again.");
-  const r = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, ...(options.headers || {}) },
-  });
-  const body = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(body.error || `Request failed (${r.status}).`);
-  return body;
-}
-
 const blankItem = () => ({ productName: "", productCode: "", quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 28 });
 
-function ProductPicker({ line, onChange }) {
-  const [query, setQuery] = useState(line.productName || "");
-  const [results, setResults] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!open || query.trim().length < 2) { setResults([]); return; }
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const result = await api(`/products?search=${encodeURIComponent(query.trim())}&pageSize=20`);
-        setResults(result.data || []);
-      } catch { setResults([]); }
-      finally { setLoading(false); }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [query, open]);
-
-  const select = (product) => {
-    const name = [product.brand, product.modelSku, product.specsCapacity].filter(Boolean).join(" ");
-    onChange({
-      ...line,
-      productId: product.id,
-      productName: name || product.productCode,
-      productCode: product.productCode || "",
-      brand: product.brand || "",
-      unitPrice: Number(product.dealerPrice ?? 0),
-      taxPercent: Number(product.gstRate ?? 28),
-      mrp: product.mrp ?? null,
-    });
-    setQuery(name || product.productCode || "");
-    setOpen(false);
-  };
-
-  return (
-    <div className="sales-product-picker">
-      <input
-        required
-        maxLength={250}
-        value={query}
-        placeholder="Search product, SKU or code…"
-        onFocus={() => setOpen(true)}
-        onChange={(e) => {
-          const value = e.target.value;
-          setQuery(value);
-          setOpen(true);
-          onChange({ ...line, productId: null, productName: value, productCode: "", brand: "", mrp: null });
-        }}
-      />
-      {line.productCode && (
-        <small>Code: {line.productCode}{line.mrp != null ? ` | MRP: ${money(line.mrp)}` : ""}</small>
-      )}
-      {open && (
-        <div className="sales-product-results">
-          {loading && <div className="sales-product-option">Searching…</div>}
-          {!loading && query.trim().length >= 2 && results.length === 0 && (
-            <div className="sales-product-option">No products found.</div>
-          )}
-          {results.map((product) => (
-            <button type="button" className="sales-product-option" key={product.id} onClick={() => select(product)}>
-              <strong>{[product.brand, product.modelSku, product.specsCapacity].filter(Boolean).join(" ") || product.productCode}</strong>
-              <span>Code: {product.productCode || "—"} | Dealer: {money(product.dealerPrice)} | MRP: {money(product.mrp)}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-const AVATAR_COLORS = ["#059669","#0EA5E9","#8B5CF6","#F59E0B","#EF4444","#EC4899","#06B6D4","#4F46E5"];
-const avatarColor = (name) => AVATAR_COLORS[(name || "?").charCodeAt(0) % AVATAR_COLORS.length];
 
 function badgeClass(status) {
   const s = String(status || "").toLowerCase().replace(/ /g, "-");
   return `pur-badge pur-badge--${s}`;
 }
 
-const fmtDate = (v) => v ? new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-
 function PurchaseDocModal({ doc, isInvoice, onClose, autoPrint = false }) {
-  useEffect(() => {
-    if (autoPrint && doc) {
-      const t = setTimeout(() => window.print(), 250);
-      return () => clearTimeout(t);
-    }
-  }, [autoPrint, doc]);
+  useAutoPrint(autoPrint && !!doc);
 
   if (!doc) return null;
 
   const vendor = doc.vendor || {};
   const items = Array.isArray(doc.items) ? doc.items : [];
-  const subtotal  = Number(doc.subtotal || 0);
-  const discount  = Number(doc.discountTotal || 0);
-  const taxable   = Number(doc.taxableValue || 0);
-  const tax       = Number(doc.taxTotal || 0);
-  const total     = Number(doc.grandTotal || 0);
-  const docNum    = doc.invoiceNumber || doc.orderNumber || `#${doc.id}`;
-  const docDate   = doc.invoiceDate || doc.orderDate;
-  const docType   = isInvoice ? "PURCHASE INVOICE" : "PURCHASE ORDER";
+  const subtotal = Number(doc.subtotal || 0);
+  const discount = Number(doc.discountTotal || 0);
+  const taxable = Number(doc.taxableValue || 0);
+  const tax = Number(doc.taxTotal || 0);
+  const total = Number(doc.grandTotal || 0);
+  const docNum = doc.invoiceNumber || doc.orderNumber || `#${doc.id}`;
+  const docDate = doc.invoiceDate || doc.orderDate;
+  const docType = isInvoice ? "PURCHASE INVOICE" : "PURCHASE ORDER";
   const dateLabel = isInvoice ? "Invoice Date" : "Order Date";
   const extraLabel = isInvoice ? "Due Date" : "Expected Delivery";
   const extraDate = isInvoice ? doc.dueDate : doc.expectedDelivery;
@@ -133,100 +41,44 @@ function PurchaseDocModal({ doc, isInvoice, onClose, autoPrint = false }) {
   return (
     <div className="sales-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <section className="sales-modal sales-order-details-modal" role="dialog" aria-modal="true" aria-labelledby="pur-doc-title">
-
-        {/* ── Printable section ── */}
         <div className="sales-print-document">
-          <div className="inv-header">
-            <div className="inv-company">
-              <div className="inv-company-name">BHARAT BATTERIES</div>
-              <div className="inv-company-sub">Your Trusted Partner in Power Solutions</div>
-            </div>
-            <div className="inv-meta">
-              <div className="inv-doc-type">{docType}</div>
-              <div className="inv-meta-row"><span>Doc No.</span><strong>{docNum}</strong></div>
-              <div className="inv-meta-row"><span>{dateLabel}</span><strong>{fmtDate(docDate)}</strong></div>
-              {extraDate && <div className="inv-meta-row"><span>{extraLabel}</span><strong>{fmtDate(extraDate)}</strong></div>}
-              <div className="inv-meta-row"><span>Status</span><strong>{doc.status || "Draft"}</strong></div>
-            </div>
-          </div>
-
-          <div className="inv-rule" />
-
-          <div className="inv-bill-section">
-            <div className="inv-section-label">PURCHASE FROM</div>
-            <div className="inv-cust-name">{vendor.businessName || "—"}</div>
-            {vendor.contactName && <div>{vendor.contactName}</div>}
-            {vendor.phone && <div>{vendor.phone}</div>}
-            {vendor.billingAddress && <div>{vendor.billingAddress}{vendor.state ? `, ${vendor.state}` : ""}</div>}
-            {vendor.gstin && <div>GSTIN: {vendor.gstin}</div>}
-          </div>
-
-          <table className="inv-items">
-            <thead>
-              <tr><th>#</th><th>Product</th><th>Code</th><th>Qty</th><th>Unit Price</th><th>Discount</th><th>GST</th><th>Total</th></tr>
-            </thead>
-            <tbody>
-              {items.map((item, i) => {
-                const q  = Number(item.quantity || 0);
-                const p  = Number(item.unitPrice || item.dealerPrice || 0);
-                const d  = Number(item.discountPercent || 0);
-                const t  = Number(item.taxPercent || 0);
-                const gross = q * p;
-                const da = gross * d / 100;
-                const taxableLine = gross - da;
-                const ga = taxableLine * t / 100;
-                return (
-                  <tr key={i}>
-                    <td>{i + 1}</td>
-                    <td>{item.productName || "—"}</td>
-                    <td>{item.productCode || "—"}</td>
-                    <td>{q}</td>
-                    <td>{money(p)}</td>
-                    <td>{d > 0 ? `${d}% (${money(da)})` : "—"}</td>
-                    <td>{t}% ({money(ga)})</td>
-                    <td><strong>{money(item.lineTotal ?? taxableLine + ga)}</strong></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          <div className="inv-totals">
-            <div className="inv-total-row"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-            <div className="inv-total-row"><span>Discount</span><span>− {money(discount)}</span></div>
-            <div className="inv-total-row"><span>Taxable Value</span><span>{money(taxable)}</span></div>
-            <div className="inv-total-row"><span>GST</span><span>{money(tax)}</span></div>
-            <div className="inv-total-row inv-grand"><span>Grand Total</span><span>{money(total)}</span></div>
-          </div>
-
-          {doc.notes && <div className="inv-notes"><strong>Notes:</strong> {doc.notes}</div>}
-
-          <div className="inv-signatures">
-            <div className="inv-sig-box"><div className="inv-sig-line" /><div>Vendor Signature</div></div>
-            <div className="inv-sig-box"><div className="inv-sig-line" /><div>For BHARAT BATTERIES<br />Authorised Signatory</div></div>
-          </div>
-
-          <div className="inv-footer-text">This is a computer-generated document. Subject to jurisdiction of local courts.</div>
+          <InvoiceDocument
+            docType={docType}
+            docNumber={docNum}
+            docDate={docDate}
+            dateLabel={dateLabel}
+            extraDate={extraDate}
+            extraLabel={extraLabel}
+            status={doc.status}
+            party={vendor}
+            partyLabel="PURCHASE FROM"
+            items={items}
+            subtotal={subtotal}
+            discount={discount}
+            taxable={taxable}
+            tax={tax}
+            total={total}
+            notes={doc.notes}
+            sigLabel="Vendor Signature"
+          />
         </div>
 
         <header style={{ padding: "8px 12px", minHeight: "auto", borderBottom: "none", justifyContent: "flex-end" }}>
-          <button type="button" className="sales-close" onClick={onClose} aria-label="Close">×</button>
+          <button type="button" className="sales-secondary" onClick={() => window.print()}>Print</button>
+          <button type="button" className="sales-close" onClick={onClose} aria-label="Close">x</button>
         </header>
       </section>
     </div>
   );
 }
 
+
 export default function Purchase({ activePage }) {
   const isInvoice = activePage === "Purchase Invoice";
 
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 200);
-    return () => clearTimeout(t);
-  }, [search]);
+  const debouncedSearch = useDebounce(search, 200);
 
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -465,7 +317,7 @@ export default function Purchase({ activePage }) {
                   <div className="purchase-line" key={i}>
                     <label style={{ gridColumn: "1 / 3" }}>
                       Product / Catalogue *
-                      <ProductPicker line={x} onChange={(updated) => setForm((f) => ({ ...f, items: f.items.map((item, j) => i === j ? updated : item) }))} />
+                      <ProductPicker line={x} onChange={(updated) => setForm((f) => ({ ...f, items: f.items.map((item, j) => i === j ? updated : item) }))} defaultTaxPercent={28} />
                     </label>
                     <label>Qty<input type="number" min="0.001" step="0.001" required value={x.quantity} onChange={(e) => changeItem(i, "quantity", e.target.value)} /></label>
                     <label>Unit price<input type="number" min="0" step="0.01" required value={x.unitPrice} onChange={(e) => changeItem(i, "unitPrice", e.target.value)} /></label>
