@@ -1,29 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { supabase } from "../lib/supabase";
+import { api } from "../lib/api";
+import { QK } from "../lib/queryKeys";
+import { useDebounce } from "../hooks/useDebounce";
 import "./Expenses.css";
 import "./Sales.css";
-
-const API_BASE = (import.meta.env.VITE_PRODUCTS_API_URL || "http://127.0.0.1:3001/api/products").replace(/\/products\/?$/, "");
 
 const today = () => new Date().toISOString().slice(0, 10);
 const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; };
 const money = (n) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(n || 0));
 const fmtDate = (v) => v ? new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-
-async function api(path, options = {}) {
-  const { data: { session }, error } = await supabase.auth.getSession();
-  if (error || !session?.access_token) throw new Error("Session expired. Please sign in again.");
-  const r = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, ...(options.headers || {}) },
-  });
-  const body = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(body.error || `Request failed (${r.status}).`);
-  return body;
-}
 
 const PAYMENT_MODES = ["Cash", "Bank", "UPI", "Card", "Cheque", "Other"];
 const CAT_COLORS = ["#D97706","#2563EB","#7C3AED","#059669","#DC2626","#0EA5E9","#EC4899","#0D9488","#F59E0B","#6366F1"];
@@ -32,11 +21,10 @@ const EMPTY_FORM = { categoryId: "", amount: "", expenseDate: today(), paymentMo
 
 export default function Expenses({ activePage = "Expenses" }) {
   const navigate = useNavigate();
-  const [categories, setCategories] = useState([]);
-  const [entries, setEntries]       = useState([]);
+  const qc = useQueryClient();
   const [search, setSearch]         = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
-  const [loading, setLoading]       = useState(true);
+  const debouncedSearch = useDebounce(search, 200);
   const [error, setError]           = useState("");
   const [notice, setNotice]         = useState("");
   const [modal, setModal]           = useState(false);
@@ -44,20 +32,22 @@ export default function Expenses({ activePage = "Expenses" }) {
   const [busy, setBusy]             = useState(false);
   const [form, setForm]             = useState(EMPTY_FORM);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try {
-      const [cats, exp] = await Promise.all([
-        api("/expense-categories"),
-        api(`/expenses?search=${encodeURIComponent(search)}&type=${encodeURIComponent(typeFilter)}`),
-      ]);
-      setCategories(cats.data || []);
-      setEntries(exp.data || []);
-    } catch (e) { setError(e.message); }
-    finally { setLoading(false); }
-  }, [search, typeFilter]);
+  const { data: catsRaw, isLoading: catsLoading } = useQuery({
+    queryKey: [QK.expenseCategories],
+    queryFn: () => api("/expense-categories"),
+    staleTime: 60_000,
+  });
 
-  useEffect(() => { const t = setTimeout(load, 200); return () => clearTimeout(t); }, [load]);
+  const { data: expRaw, isLoading: expLoading } = useQuery({
+    queryKey: [QK.expenses, debouncedSearch, typeFilter],
+    queryFn: () => api(`/expenses?search=${encodeURIComponent(debouncedSearch)}&type=${encodeURIComponent(typeFilter)}`),
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+  });
+
+  const categories = catsRaw?.data || [];
+  const entries    = expRaw?.data  || [];
+  const loading    = catsLoading || expLoading;
 
   const totalAmt    = useMemo(() => entries.reduce((s, e) => s + Number(e.amount || 0), 0), [entries]);
   const directAmt   = useMemo(() => entries.filter(e => e.categoryType === "Direct").reduce((s, e) => s + Number(e.amount || 0), 0), [entries]);
@@ -101,7 +91,7 @@ export default function Expenses({ activePage = "Expenses" }) {
       await api(path, { method: editingId ? "PUT" : "POST", body: JSON.stringify(payload) });
       setNotice(editingId ? "Expense updated." : "Expense saved.");
       setModal(false);
-      await load();
+      qc.invalidateQueries({ queryKey: [QK.expenses] });
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   };
@@ -109,8 +99,10 @@ export default function Expenses({ activePage = "Expenses" }) {
   const deleteEntry = async (id) => {
     if (!window.confirm("Delete this expense entry?")) return;
     setError("");
-    try { await api(`/expenses/${id}`, { method: "DELETE" }); await load(); }
-    catch (err) { setError(err.message); }
+    try {
+      await api(`/expenses/${id}`, { method: "DELETE" });
+      qc.invalidateQueries({ queryKey: [QK.expenses] });
+    } catch (err) { setError(err.message); }
   };
 
   return (
@@ -140,7 +132,7 @@ export default function Expenses({ activePage = "Expenses" }) {
             </div>
           </div>
 
-          {categories.length === 0 && !loading && (
+          {categories.length === 0 && !catsLoading && (
             <div className="exp-notice">
               No expense categories yet.{" "}
               <button type="button" onClick={() => navigate("/expenses/categories")} style={{ background: "none", border: "none", color: "#D97706", fontWeight: 700, cursor: "pointer", padding: 0, textDecoration: "underline" }}>
@@ -287,7 +279,7 @@ export default function Expenses({ activePage = "Expenses" }) {
               </label>
 
               <label>
-                Amount (₹) *
+                Amount (&#8377;) *
                 <input type="number" min="0.01" step="0.01" required value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} placeholder="0.00" />
               </label>
 

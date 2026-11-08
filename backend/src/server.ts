@@ -1176,13 +1176,24 @@ app.put('/api/sales/invoices/:id', requireSupabaseUser, async (req, res) => {
   } catch (e) { console.error('Invoice update failed:', e instanceof Error ? e.message : e); res.status(500).json({ error: 'Unable to update invoice.' }); }
 });
 
-app.get('/api/sales/payments', requireSupabaseUser, async (_req, res) => {
+app.get('/api/sales/payments', requireSupabaseUser, async (req, res) => {
+  const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
   try {
-    const result = await pool.query(`SELECT cp.id, cp.receipt_number AS "receiptNumber", cp.customer_id AS "customerId", cp.invoice_id AS "invoiceId",
-      cp.payment_date AS "paymentDate", cp.amount, cp.payment_method AS "paymentMethod", cp.reference_number AS "referenceNumber", cp.status,
-      cp.notes, cp.created_at AS "createdAt", cp.receipt_number AS "receiptNumber",
-      si.invoice_number AS "invoiceNumber", cp.customer_id AS "customerId", si.customer_snapshot->>'businessName' AS "businessName"
-      FROM public.customer_payments cp LEFT JOIN public.sales_invoices si ON si.id=cp.invoice_id ORDER BY cp.created_at DESC LIMIT 200`);
+    const result = await pool.query(
+      `SELECT cp.id, cp.receipt_number AS "receiptNumber", cp.customer_id AS "customerId", cp.invoice_id AS "invoiceId",
+        cp.payment_date AS "paymentDate", cp.amount, cp.payment_method AS "paymentMethod",
+        cp.reference_number AS "referenceNumber", cp.status, cp.notes, cp.created_at AS "createdAt",
+        si.invoice_number AS "invoiceNumber",
+        COALESCE(si.customer_snapshot->>'businessName', c.business_name) AS "businessName"
+       FROM public.customer_payments cp
+       LEFT JOIN public.sales_invoices si ON si.id = cp.invoice_id
+       LEFT JOIN public.customers c ON c.id = cp.customer_id
+       WHERE ($1 = '' OR cp.receipt_number ILIKE $2
+           OR COALESCE(si.customer_snapshot->>'businessName', c.business_name) ILIKE $2
+           OR COALESCE(si.invoice_number, '') ILIKE $2)
+       ORDER BY cp.created_at DESC LIMIT 200`,
+      [search, `%${search.replace(/[\\%_]/g, '\\$&')}%`],
+    );
     res.json({ data: result.rows });
   } catch (error) { console.error('Payments lookup failed:', error instanceof Error ? error.message : error); res.status(500).json({ error: 'Unable to load payments.' }); }
 });
@@ -1272,7 +1283,42 @@ app.put('/api/sales/challans/:id', requireSupabaseUser, async (req, res) => {
   } catch (e) { await client.query('ROLLBACK').catch(() => undefined); const pe = e as { code?: string }; if (pe.code === '23505') { res.status(409).json({ error: 'Challan number already exists.' }); return; } console.error('Challan update failed:', e); res.status(500).json({ error: 'Unable to update challan.' }); } finally { client.release(); }
 });
 
-app.patch('/api/sales/challans/:id/status', requireSupabaseUser, async (req, res) => { const id = validCustomerId(req.params.id); const status = String(req.body?.status || ''); if (!id || !['Dispatched', 'Delivered', 'Cancelled'].includes(status)) { res.status(400).json({ error: 'Invalid challan or status.' }); return; } try { const r = await pool.query(`UPDATE public.delivery_challans SET status=$2,updated_at=NOW() WHERE id=$1 AND status<>'Cancelled' RETURNING id,status`, [id, status]); if (!r.rowCount) { res.status(404).json({ error: 'Challan not found or already cancelled.' }); return; } res.json({ success: true, challan: r.rows[0] }); } catch (e) { res.status(500).json({ error: 'Unable to update challan status.' }); } });
+app.patch('/api/sales/challans/:id/status', requireSupabaseUser, async (req, res) => {
+  const id = validCustomerId(req.params.id);
+  const status = String(req.body?.status || '');
+  if (!id || !['Dispatched', 'Delivered', 'Cancelled'].includes(status)) {
+    res.status(400).json({ error: 'Invalid challan or status.' }); return;
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const r = await client.query(
+      `UPDATE public.delivery_challans SET status=$2, updated_at=NOW()
+       WHERE id=$1 AND status<>'Cancelled'
+       RETURNING id, status, sales_order_id`,
+      [id, status],
+    );
+    if (!r.rowCount) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ error: 'Challan not found or already cancelled.' }); return;
+    }
+    const challan = r.rows[0];
+    // Advance linked sales order status when challan is dispatched or delivered
+    if (challan.sales_order_id && (status === 'Dispatched' || status === 'Delivered')) {
+      const orderStatus = status === 'Delivered' ? 'Delivered' : 'Partially Delivered';
+      await client.query(
+        `UPDATE public.sales_orders SET status=$2, updated_at=NOW()
+         WHERE id=$1 AND status NOT IN ('Delivered','Cancelled')`,
+        [challan.sales_order_id, orderStatus],
+      );
+    }
+    await client.query('COMMIT');
+    res.json({ success: true, challan: { id: challan.id, status: challan.status } });
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    res.status(500).json({ error: 'Unable to update challan status.' });
+  } finally { client.release(); }
+});
 
 app.get('/api/sales/credit-notes', requireSupabaseUser, async (req, res) => { const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : ''; try { const r = await pool.query(`SELECT cn.id,cn.credit_note_number AS "creditNoteNumber",cn.invoice_id AS "invoiceId",cn.customer_id AS "customerId",cn.customer_snapshot AS customer,cn.items,cn.credit_date AS "creditDate",cn.amount,cn.reason,cn.status,si.invoice_number AS "invoiceNumber" FROM public.credit_notes cn LEFT JOIN public.sales_invoices si ON si.id=cn.invoice_id WHERE ($1='' OR cn.credit_note_number ILIKE $2 OR cn.customer_snapshot->>'businessName' ILIKE $2) ORDER BY cn.created_at DESC LIMIT 200`, [search, `%${search.replace(/[\\%_]/g, '\\$&')}%`]); res.json({ data: r.rows }); } catch (e) { res.status(500).json({ error: 'Unable to load credit notes.' }); } });
 app.post('/api/sales/credit-notes', requireSupabaseUser, async (req, res) => { const user = res.locals.authenticatedUser as AuthenticatedUser; const b = req.body as Record<string, unknown>; const number = typeof b.creditNoteNumber === 'string' ? b.creditNoteNumber.trim().slice(0, 80) : ''; const customerId = validCustomerId(b.customerId); const invoiceId = b.invoiceId == null || b.invoiceId === '' ? null : validCustomerId(b.invoiceId); const amount = Number(b.amount); const reason = typeof b.reason === 'string' ? b.reason.trim().slice(0, 1000) : ''; if (!number || !customerId || !Number.isFinite(amount) || amount <= 0 || !reason) { res.status(400).json({ error: 'Provide credit note number, customer, positive amount and reason.' }); return; } const client = await pool.connect(); try { await client.query('BEGIN'); const c = await client.query('SELECT id,business_name,contact_name,phone,gstin,billing_address,state FROM public.customers WHERE id=$1', [customerId]); if (!c.rowCount) { await client.query('ROLLBACK'); res.status(400).json({ error: 'Customer not found.' }); return; } if (invoiceId) { const inv = await client.query('SELECT id,customer_id,grand_total,status FROM public.sales_invoices WHERE id=$1 FOR UPDATE', [invoiceId]); if (!inv.rowCount || Number(inv.rows[0].customer_id) !== customerId || inv.rows[0].status === 'Void' || amount > Number(inv.rows[0].grand_total)) { await client.query('ROLLBACK'); res.status(400).json({ error: 'Invoice is invalid for this customer or credit amount exceeds invoice total.' }); return; } } const snap = { id: c.rows[0].id, businessName: c.rows[0].business_name, contactName: c.rows[0].contact_name, phone: c.rows[0].phone, gstin: c.rows[0].gstin, billingAddress: c.rows[0].billing_address, state: c.rows[0].state }; const r = await client.query(`INSERT INTO public.credit_notes(credit_note_number,invoice_id,customer_id,customer_snapshot,items,credit_date,amount,reason,status,created_by) VALUES($1,$2,$3,$4::jsonb,'[]'::jsonb,COALESCE(NULLIF($5,'')::date,CURRENT_DATE),$6,$7,$8,$9) RETURNING id,credit_note_number AS "creditNoteNumber",amount,status`, [number, invoiceId, customerId, JSON.stringify(snap), typeof b.creditDate === 'string' ? b.creditDate : '', amount, reason, b.status === 'Issued' ? 'Issued' : 'Draft', user.id]); await client.query(`INSERT INTO public.sales_document_audit(document_type,document_id,action,after_data,actor_id) VALUES('Credit Note',$1,'created',$2::jsonb,$3)`, [r.rows[0].id, JSON.stringify(r.rows[0]), user.id]); await client.query('COMMIT'); res.status(201).json({ success: true, creditNote: r.rows[0] }); } catch (e) { await client.query('ROLLBACK').catch(() => undefined); const pe = e as { code?: string }; if (pe.code === '23505') { res.status(409).json({ error: 'Credit note number already exists.' }); return; } console.error('Credit note create failed:', e); res.status(500).json({ error: 'Unable to create credit note.' }); } finally { client.release(); } });
@@ -1539,6 +1585,27 @@ app.put('/api/purchase/invoices/:id', requireSupabaseUser, async (req, res) => {
   } catch (e) { console.error('Purchase invoice update failed:', e); res.status(500).json({ error: 'Unable to update purchase invoice.' }); }
 });
 
+// Purchase Invoice status update (Draft → Received → Partially Paid → Paid | Void)
+app.patch('/api/purchase/invoices/:id/status', requireSupabaseUser, async (req, res) => {
+  const id = validCustomerId(req.params.id);
+  const status = String(req.body?.status || '');
+  const VALID = ['Received', 'Partially Paid', 'Paid', 'Overdue', 'Void'];
+  if (!id || !VALID.includes(status)) {
+    res.status(400).json({ error: 'Valid status required: Received, Partially Paid, Paid, Overdue, or Void.' });
+    return;
+  }
+  try {
+    const r = await pool.query(
+      `UPDATE public.purchase_invoices SET status=$2, updated_at=NOW()
+       WHERE id=$1 AND status <> 'Void'
+       RETURNING id, invoice_number AS "invoiceNumber", status`,
+      [id, status],
+    );
+    if (!r.rowCount) { res.status(404).json({ error: 'Purchase invoice not found or already voided.' }); return; }
+    res.json({ success: true, invoice: r.rows[0] });
+  } catch (e) { console.error('Purchase invoice status update failed:', e); res.status(500).json({ error: 'Unable to update purchase invoice status.' }); }
+});
+
 // Debit Notes
 app.get('/api/purchase/debit-notes', requireSupabaseUser, async (req, res) => {
   const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
@@ -1645,6 +1712,7 @@ app.get('/api/purchase/summary', requireSupabaseUser, async (_req, res) => {
 
 // Reports: Profit & Loss
 app.get('/api/reports/profit-loss', requireSupabaseUser, async (req, res) => {
+  const userId = (res.locals.authenticatedUser as AuthenticatedUser).id;
   const now = new Date();
   const y = now.getFullYear();
   const fyYear = now.getMonth() >= 3 ? y : y - 1;
@@ -1695,16 +1763,16 @@ app.get('/api/reports/profit-loss', requireSupabaseUser, async (req, res) => {
           SELECT c.name, COALESCE(SUM(e.amount),0)::numeric AS total
           FROM public.expense_entries e
           JOIN public.expense_categories c ON c.id = e.category_id
-          WHERE e.expense_date BETWEEN $1 AND $2 AND c.type = 'Direct'
+          WHERE e.created_by = $3 AND e.expense_date BETWEEN $1 AND $2 AND c.type = 'Direct'
           GROUP BY c.name ORDER BY total DESC
-        `, [from, to]),
+        `, [from, to, userId]),
         pool.query(`
           SELECT c.name, COALESCE(SUM(e.amount),0)::numeric AS total
           FROM public.expense_entries e
           JOIN public.expense_categories c ON c.id = e.category_id
-          WHERE e.expense_date BETWEEN $1 AND $2 AND c.type = 'Indirect'
+          WHERE e.created_by = $3 AND e.expense_date BETWEEN $1 AND $2 AND c.type = 'Indirect'
           GROUP BY c.name ORDER BY total DESC
-        `, [from, to]),
+        `, [from, to, userId]),
         pool.query(`
           SELECT
             TO_CHAR(DATE_TRUNC('month', e.expense_date), 'YYYY-MM') AS month,
@@ -1712,10 +1780,10 @@ app.get('/api/reports/profit-loss', requireSupabaseUser, async (req, res) => {
             COALESCE(SUM(CASE WHEN c.type='Indirect' THEN e.amount ELSE 0 END),0)::numeric AS indirect
           FROM public.expense_entries e
           JOIN public.expense_categories c ON c.id = e.category_id
-          WHERE e.expense_date BETWEEN $1 AND $2
+          WHERE e.created_by = $3 AND e.expense_date BETWEEN $1 AND $2
           GROUP BY DATE_TRUNC('month', e.expense_date)
           ORDER BY DATE_TRUNC('month', e.expense_date)
-        `, [from, to]),
+        `, [from, to, userId]),
       ]);
       directByCategory   = directRes.rows.map((r: { name: string; total: string }) => ({ name: r.name, total: Number(r.total) }));
       indirectByCategory = indirectRes.rows.map((r: { name: string; total: string }) => ({ name: r.name, total: Number(r.total) }));
@@ -1786,12 +1854,16 @@ app.get('/api/reports/profit-loss', requireSupabaseUser, async (req, res) => {
 });
 
 // Reports: Balance Sheet
-app.get('/api/reports/balance-sheet', requireSupabaseUser, async (_req, res) => {
+app.get('/api/reports/balance-sheet', requireSupabaseUser, async (req, res) => {
+  const userId = (res.locals.authenticatedUser as AuthenticatedUser).id;
   try {
     // plExpRow fetched separately — isolated so a missing expenses table never breaks the balance sheet
     let totalExpensesForBS = 0;
     try {
-      const expRow = await pool.query(`SELECT COALESCE(SUM(amount),0)::numeric AS total FROM public.expense_entries`);
+      const expRow = await pool.query(
+        `SELECT COALESCE(SUM(amount),0)::numeric AS total FROM public.expense_entries WHERE created_by = $1`,
+        [userId],
+      );
       totalExpensesForBS = Number(expRow.rows[0].total);
     } catch (_e) { /* expense_entries table may not exist yet */ }
 
@@ -1882,7 +1954,11 @@ app.get('/api/reports/cash-flow', requireSupabaseUser, async (req, res) => {
       pool.query(`SELECT COALESCE(SUM(grand_total),0)::numeric AS total FROM public.purchase_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status='Paid'`, [from, to]),
       pool.query(`SELECT TO_CHAR(DATE_TRUNC('month',payment_date),'YYYY-MM') AS month, COALESCE(SUM(amount),0)::numeric AS inflow FROM public.customer_payments WHERE payment_date BETWEEN $1 AND $2 AND status='Received' GROUP BY DATE_TRUNC('month',payment_date) ORDER BY DATE_TRUNC('month',payment_date)`, [from, to]),
       pool.query(`SELECT TO_CHAR(DATE_TRUNC('month',invoice_date),'YYYY-MM') AS month, COALESCE(SUM(grand_total),0)::numeric AS outflow FROM public.purchase_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status='Paid' GROUP BY DATE_TRUNC('month',invoice_date) ORDER BY DATE_TRUNC('month',invoice_date)`, [from, to]),
-      pool.query(`SELECT p.receipt_number AS "receiptNumber", p.amount, p.payment_date AS "paymentDate", p.payment_method AS "paymentMethod", p.status, p.customer_snapshot AS customer FROM public.customer_payments p WHERE p.payment_date BETWEEN $1 AND $2 ORDER BY p.payment_date DESC LIMIT 8`, [from, to]),
+      pool.query(`SELECT p.receipt_number AS "receiptNumber", p.amount, p.payment_date AS "paymentDate", p.payment_method AS "paymentMethod", p.status,
+        json_build_object('businessName', c.business_name, 'phone', c.phone) AS customer
+        FROM public.customer_payments p
+        LEFT JOIN public.customers c ON c.id = p.customer_id
+        WHERE p.payment_date BETWEEN $1 AND $2 ORDER BY p.payment_date DESC LIMIT 8`, [from, to]),
     ]);
     const totalInflow = Number(inflow.rows[0].total);
     const totalOutflow = Number(outflow.rows[0].total);
@@ -1902,7 +1978,11 @@ app.get('/api/reports/banking', requireSupabaseUser, async (req, res) => {
   try {
     const [byMethod, recent, monthly] = await Promise.all([
       pool.query(`SELECT payment_method AS method, COALESCE(SUM(amount),0)::numeric AS total, COUNT(*)::int AS count FROM public.customer_payments WHERE payment_date BETWEEN $1 AND $2 AND status='Received' GROUP BY payment_method ORDER BY total DESC`, [from, to]),
-      pool.query(`SELECT p.receipt_number AS "receiptNumber", p.amount, p.payment_date AS "paymentDate", p.payment_method AS "paymentMethod", p.reference_number AS "referenceNumber", p.status, p.customer_snapshot AS customer FROM public.customer_payments p WHERE p.payment_date BETWEEN $1 AND $2 ORDER BY p.payment_date DESC LIMIT 20`, [from, to]),
+      pool.query(`SELECT p.receipt_number AS "receiptNumber", p.amount, p.payment_date AS "paymentDate", p.payment_method AS "paymentMethod", p.reference_number AS "referenceNumber", p.status,
+        json_build_object('businessName', c.business_name, 'phone', c.phone) AS customer
+        FROM public.customer_payments p
+        LEFT JOIN public.customers c ON c.id = p.customer_id
+        WHERE p.payment_date BETWEEN $1 AND $2 ORDER BY p.payment_date DESC LIMIT 20`, [from, to]),
       pool.query(`SELECT TO_CHAR(DATE_TRUNC('month',payment_date),'YYYY-MM') AS month, COALESCE(SUM(amount),0)::numeric AS total, COUNT(*)::int AS count FROM public.customer_payments WHERE payment_date BETWEEN $1 AND $2 AND status='Received' GROUP BY DATE_TRUNC('month',payment_date) ORDER BY DATE_TRUNC('month',payment_date)`, [from, to]),
     ]);
     const grandTotal = byMethod.rows.reduce((s: number, r: { total: string }) => s + Number(r.total), 0);

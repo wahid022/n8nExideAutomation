@@ -18,6 +18,10 @@ export const QK = {
   purchaseSummary:        "purchase-summary",
   purchaseDebitNotes:     "purchase-debit-notes",
 
+  // Expenses
+  expenseCategories:      "expense-categories",
+  expenses:               "expenses",
+
   // Reports
   reportsPL:              "reports-pl",
   reportsBS:              "reports-bs",

@@ -350,7 +350,7 @@ function BalanceSheet() {
   liabRows.push({ label: "Net GST Payable", total: Math.max(0, gstPos.netGstPayable || 0) });
   liabRows.push({ type: "empty" });
   liabRows.push({ label: "Profit & Loss A/c", type: "subsection" });
-  liabRows.push({ label: "Current Period Profit (Gross)", sub: plProfit, indent: 2 });
+  liabRows.push({ label: "Current Period Net Profit", sub: plProfit, indent: 2 });
   liabRows.push({ label: " ", total: plProfit });
   liabRows.push({ type: "divider" });
   liabRows.push({ label: "Total", total: liabilities.totalLiabilities, type: "total" });

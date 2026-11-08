@@ -1,24 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { supabase } from "../lib/supabase";
+import { api } from "../lib/api";
+import { QK } from "../lib/queryKeys";
 import "./Expenses.css";
 import "./Sales.css";
-
-const API_BASE = (import.meta.env.VITE_PRODUCTS_API_URL || "http://127.0.0.1:3001/api/products").replace(/\/products\/?$/, "");
-
-async function api(path, options = {}) {
-  const { data: { session }, error } = await supabase.auth.getSession();
-  if (error || !session?.access_token) throw new Error("Session expired. Please sign in again.");
-  const r = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, ...(options.headers || {}) },
-  });
-  const body = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(body.error || `Request failed (${r.status}).`);
-  return body;
-}
 
 const CAT_COLORS = ["#D97706","#2563EB","#7C3AED","#059669","#DC2626","#0EA5E9","#EC4899","#0D9488","#F59E0B","#6366F1"];
 const catColor = (name) => CAT_COLORS[String(name || "").charCodeAt(0) % CAT_COLORS.length];
@@ -44,8 +32,7 @@ const SUGGESTIONS = [
 
 export default function ExpenseCategories({ activePage = "Expense Categories" }) {
   const navigate = useNavigate();
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading]       = useState(true);
+  const qc = useQueryClient();
   const [error, setError]           = useState("");
   const [notice, setNotice]         = useState("");
   const [search, setSearch]         = useState("");
@@ -55,16 +42,12 @@ export default function ExpenseCategories({ activePage = "Expense Categories" })
   const [saving, setSaving]         = useState(false);
   const [form, setForm]             = useState(EMPTY);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try {
-      const r = await api("/expense-categories");
-      setCategories(r.data || []);
-    } catch (e) { setError(e.message); }
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+  const { data: raw, isLoading: loading } = useQuery({
+    queryKey: [QK.expenseCategories],
+    queryFn: () => api("/expense-categories"),
+    staleTime: 60_000,
+  });
+  const categories = raw?.data || [];
 
   const filtered = categories.filter(c => {
     const matchType   = typeFilter === "All" || c.type === typeFilter;
@@ -84,7 +67,9 @@ export default function ExpenseCategories({ activePage = "Expense Categories" })
       const path = editingId ? `/expense-categories/${editingId}` : "/expense-categories";
       await api(path, { method: editingId ? "PUT" : "POST", body: JSON.stringify(form) });
       setNotice(editingId ? `"${form.name}" updated.` : `"${form.name}" added.`);
-      setModal(false); setForm(EMPTY); setEditingId(null); await load();
+      setModal(false); setForm(EMPTY); setEditingId(null);
+      qc.invalidateQueries({ queryKey: [QK.expenseCategories] });
+      qc.invalidateQueries({ queryKey: [QK.expenses] });
     } catch (err) { setError(err.message); }
     finally { setSaving(false); }
   };
@@ -92,8 +77,11 @@ export default function ExpenseCategories({ activePage = "Expense Categories" })
   const deleteCategory = async (c) => {
     if (!window.confirm(`Delete category "${c.name}"? This cannot be undone if it has linked expenses.`)) return;
     setError("");
-    try { await api(`/expense-categories/${c.id}`, { method: "DELETE" }); await load(); }
-    catch (err) { setError(err.message); }
+    try {
+      await api(`/expense-categories/${c.id}`, { method: "DELETE" });
+      qc.invalidateQueries({ queryKey: [QK.expenseCategories] });
+      qc.invalidateQueries({ queryKey: [QK.expenses] });
+    } catch (err) { setError(err.message); }
   };
 
   const addSuggestion = async (s) => {
@@ -101,7 +89,8 @@ export default function ExpenseCategories({ activePage = "Expense Categories" })
     try {
       await api("/expense-categories", { method: "POST", body: JSON.stringify({ name: s.name, type: s.type, description: "" }) });
       setNotice(`"${s.name}" added.`);
-      await load();
+      qc.invalidateQueries({ queryKey: [QK.expenseCategories] });
+      qc.invalidateQueries({ queryKey: [QK.expenses] });
     } catch (err) { setError(err.message); }
   };
 

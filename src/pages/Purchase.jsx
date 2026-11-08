@@ -91,6 +91,7 @@ export default function Purchase({ activePage }) {
   const [form, setForm] = useState({});
   const [viewDoc, setViewDoc] = useState(null);
   const [autoPrintDoc, setAutoPrintDoc] = useState(false);
+  const [statusRow, setStatusRow] = useState(null); // { id, current } for inline status picker
 
   const docPrefix = isInvoice ? "PINV" : "PO";
   const apiPath   = isInvoice ? "/purchase/invoices" : "/purchase/orders";
@@ -140,6 +141,17 @@ export default function Purchase({ activePage }) {
   };
 
   const changeItem = (i, k, v) => setForm((f) => ({ ...f, items: f.items.map((x, j) => i === j ? { ...x, [k]: v } : x) }));
+
+  const changeStatus = async (id, status) => {
+    setError("");
+    try {
+      await api(`/purchase/invoices/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+      setNotice(`Invoice marked as ${status}.`);
+      setStatusRow(null);
+      qc.invalidateQueries({ queryKey: [qKey] });
+      qc.invalidateQueries({ queryKey: [QK.purchaseSummary] });
+    } catch (err) { setError(err.message); }
+  };
 
   const save = async (e) => {
     e.preventDefault(); setBusy(true); setError("");
@@ -246,6 +258,33 @@ export default function Purchase({ activePage }) {
                                 <svg viewBox="0 0 14 14" fill="none" width="12" height="12" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2.5l2 2-6 6H3.5v-2l6-6z" stroke="currentColor"/><path d="M8 4l2 2" stroke="currentColor"/></svg>
                                 Edit
                               </button>
+                            )}
+                            {isInvoice && r.status !== "Void" && (
+                              <div style={{ position: "relative" }}>
+                                <button
+                                  className="si-action-btn"
+                                  style={{ background: "#F0FDF4", borderColor: "#86EFAC", color: "#166534" }}
+                                  onClick={() => setStatusRow(statusRow?.id === r.id ? null : { id: r.id, current: r.status })}
+                                >
+                                  <svg viewBox="0 0 14 14" fill="none" width="12" height="12" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 7h10M8 4l4 3-4 3" stroke="currentColor"/></svg>
+                                  Mark
+                                </button>
+                                {statusRow?.id === r.id && (
+                                  <div style={{ position: "absolute", right: 0, top: "100%", marginTop: 4, background: "#fff", border: "1.5px solid #E2E8F0", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 50, minWidth: 160, padding: 6 }}>
+                                    {["Received", "Partially Paid", "Paid", "Overdue", "Void"].map(s => (
+                                      <button
+                                        key={s}
+                                        type="button"
+                                        onClick={() => changeStatus(r.id, s)}
+                                        disabled={s === statusRow.current}
+                                        style={{ display: "block", width: "100%", textAlign: "left", padding: "7px 12px", border: "none", background: s === statusRow.current ? "#F8FAFC" : "#fff", color: s === "Void" ? "#DC2626" : s === statusRow.current ? "#94A3B8" : "#0F172A", fontSize: 12, fontWeight: s === statusRow.current ? 600 : 500, borderRadius: 7, cursor: s === statusRow.current ? "default" : "pointer" }}
+                                      >
+                                        {s === statusRow.current ? `✓ ${s}` : s}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                             )}
                             <button className="si-action-btn si-action-btn--print" title="Print" onClick={() => { setAutoPrintDoc(true); setViewDoc(r); }}>
                               <svg viewBox="0 0 14 14" fill="none" width="12" height="12" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="10" height="7" rx="1" stroke="currentColor"/><path d="M4 4V2h6v2" stroke="currentColor"/><rect x="4" y="8" width="6" height="2" rx=".5" stroke="currentColor" strokeWidth="1"/></svg>
