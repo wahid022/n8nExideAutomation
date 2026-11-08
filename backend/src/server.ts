@@ -1827,6 +1827,208 @@ app.get('/api/reports/banking', requireSupabaseUser, async (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
+// Expense Categories
+// -----------------------------------------------------------------------------
+
+app.get('/api/expense-categories', requireSupabaseUser, async (req, res) => {
+  const userId = (res.locals.authenticatedUser as AuthenticatedUser).id;
+  try {
+    const r = await pool.query(
+      `SELECT id, name, type, description, created_at AS "createdAt"
+       FROM public.expense_categories
+       WHERE created_by = $1
+       ORDER BY type, name`,
+      [userId],
+    );
+    res.json({ data: r.rows });
+  } catch (e) {
+    console.error('expense-categories GET failed:', e);
+    res.status(500).json({ error: 'Unable to fetch expense categories.' });
+  }
+});
+
+app.post('/api/expense-categories', requireSupabaseUser, async (req, res) => {
+  const userId = (res.locals.authenticatedUser as AuthenticatedUser).id;
+  const { name, type, description } = req.body as { name?: string; type?: string; description?: string };
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    res.status(400).json({ error: 'Category name is required.' }); return;
+  }
+  const catType = type === 'Direct' ? 'Direct' : 'Indirect';
+  try {
+    const r = await pool.query(
+      `INSERT INTO public.expense_categories (name, type, description, created_by)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, name, type, description`,
+      [name.trim(), catType, (description || '').trim() || null, userId],
+    );
+    res.status(201).json({ data: r.rows[0] });
+  } catch (e: unknown) {
+    if ((e as { code?: string }).code === '23505') {
+      res.status(409).json({ error: 'A category with this name already exists.' }); return;
+    }
+    console.error('expense-categories POST failed:', e);
+    res.status(500).json({ error: 'Unable to create expense category.' });
+  }
+});
+
+app.put('/api/expense-categories/:id', requireSupabaseUser, async (req, res) => {
+  const userId = (res.locals.authenticatedUser as AuthenticatedUser).id;
+  const id = Number(req.params.id);
+  const { name, type, description } = req.body as { name?: string; type?: string; description?: string };
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    res.status(400).json({ error: 'Category name is required.' }); return;
+  }
+  const catType = type === 'Direct' ? 'Direct' : 'Indirect';
+  try {
+    const r = await pool.query(
+      `UPDATE public.expense_categories
+       SET name=$1, type=$2, description=$3, updated_at=NOW()
+       WHERE id=$4 AND created_by=$5
+       RETURNING id, name, type, description`,
+      [name.trim(), catType, (description || '').trim() || null, id, userId],
+    );
+    if (!r.rowCount) { res.status(404).json({ error: 'Category not found.' }); return; }
+    res.json({ data: r.rows[0] });
+  } catch (e) {
+    console.error('expense-categories PUT failed:', e);
+    res.status(500).json({ error: 'Unable to update expense category.' });
+  }
+});
+
+app.delete('/api/expense-categories/:id', requireSupabaseUser, async (req, res) => {
+  const userId = (res.locals.authenticatedUser as AuthenticatedUser).id;
+  const id = Number(req.params.id);
+  try {
+    const r = await pool.query(
+      `DELETE FROM public.expense_categories WHERE id=$1 AND created_by=$2`,
+      [id, userId],
+    );
+    if (!r.rowCount) { res.status(404).json({ error: 'Category not found.' }); return; }
+    res.json({ success: true });
+  } catch (e: unknown) {
+    if ((e as { code?: string }).code === '23503') {
+      res.status(409).json({ error: 'Cannot delete — this category has expense entries linked to it.' }); return;
+    }
+    console.error('expense-categories DELETE failed:', e);
+    res.status(500).json({ error: 'Unable to delete expense category.' });
+  }
+});
+
+// -----------------------------------------------------------------------------
+// Expense Entries
+// -----------------------------------------------------------------------------
+
+app.get('/api/expenses', requireSupabaseUser, async (req, res) => {
+  const userId = (res.locals.authenticatedUser as AuthenticatedUser).id;
+  const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+  const type   = typeof req.query.type   === 'string' ? req.query.type.trim()   : 'All';
+  const params: unknown[] = [userId];
+  let where = 'e.created_by = $1';
+  if (type === 'Direct' || type === 'Indirect') {
+    params.push(type);
+    where += ` AND c.type = $${params.length}`;
+  }
+  if (search) {
+    params.push(`%${search}%`);
+    const n = params.length;
+    where += ` AND (c.name ILIKE $${n} OR e.notes ILIKE $${n} OR e.reference_no ILIKE $${n})`;
+  }
+  try {
+    const r = await pool.query(
+      `SELECT e.id, e.category_id AS "categoryId", c.name AS "categoryName", c.type AS "categoryType",
+              e.amount, e.expense_date AS "expenseDate", e.payment_mode AS "paymentMode",
+              e.reference_no AS "referenceNo", e.notes, e.created_at AS "createdAt"
+       FROM public.expense_entries e
+       JOIN public.expense_categories c ON c.id = e.category_id
+       WHERE ${where}
+       ORDER BY e.expense_date DESC, e.id DESC`,
+      params,
+    );
+    res.json({ data: r.rows });
+  } catch (e) {
+    console.error('expenses GET failed:', e);
+    res.status(500).json({ error: 'Unable to fetch expenses.' });
+  }
+});
+
+app.post('/api/expenses', requireSupabaseUser, async (req, res) => {
+  const userId = (res.locals.authenticatedUser as AuthenticatedUser).id;
+  const { categoryId, amount, expenseDate, paymentMode, referenceNo, notes } =
+    req.body as { categoryId?: number; amount?: number; expenseDate?: string; paymentMode?: string; referenceNo?: string | null; notes?: string | null };
+  if (!categoryId || isNaN(Number(categoryId))) {
+    res.status(400).json({ error: 'Valid category is required.' }); return;
+  }
+  if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+    res.status(400).json({ error: 'Amount must be greater than 0.' }); return;
+  }
+  const MODES = ['Cash', 'Bank', 'UPI', 'Card', 'Cheque', 'Other'];
+  const mode = MODES.includes(paymentMode || '') ? paymentMode : 'Cash';
+  try {
+    const catCheck = await pool.query(
+      `SELECT id FROM public.expense_categories WHERE id=$1 AND created_by=$2`,
+      [categoryId, userId],
+    );
+    if (!catCheck.rowCount) {
+      res.status(400).json({ error: 'Category not found.' }); return;
+    }
+    const r = await pool.query(
+      `INSERT INTO public.expense_entries
+         (category_id, amount, expense_date, payment_mode, reference_no, notes, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       RETURNING id`,
+      [categoryId, Number(amount), expenseDate || new Date().toISOString().slice(0, 10), mode, referenceNo || null, notes || null, userId],
+    );
+    res.status(201).json({ data: r.rows[0] });
+  } catch (e) {
+    console.error('expenses POST failed:', e);
+    res.status(500).json({ error: 'Unable to save expense.' });
+  }
+});
+
+app.put('/api/expenses/:id', requireSupabaseUser, async (req, res) => {
+  const userId = (res.locals.authenticatedUser as AuthenticatedUser).id;
+  const id = Number(req.params.id);
+  const { categoryId, amount, expenseDate, paymentMode, referenceNo, notes } =
+    req.body as { categoryId?: number; amount?: number; expenseDate?: string; paymentMode?: string; referenceNo?: string | null; notes?: string | null };
+  if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+    res.status(400).json({ error: 'Amount must be greater than 0.' }); return;
+  }
+  const MODES = ['Cash', 'Bank', 'UPI', 'Card', 'Cheque', 'Other'];
+  const mode = MODES.includes(paymentMode || '') ? paymentMode : 'Cash';
+  try {
+    const r = await pool.query(
+      `UPDATE public.expense_entries
+       SET category_id=$1, amount=$2, expense_date=$3, payment_mode=$4,
+           reference_no=$5, notes=$6, updated_at=NOW()
+       WHERE id=$7 AND created_by=$8
+       RETURNING id`,
+      [categoryId, Number(amount), expenseDate, mode, referenceNo || null, notes || null, id, userId],
+    );
+    if (!r.rowCount) { res.status(404).json({ error: 'Expense not found.' }); return; }
+    res.json({ data: r.rows[0] });
+  } catch (e) {
+    console.error('expenses PUT failed:', e);
+    res.status(500).json({ error: 'Unable to update expense.' });
+  }
+});
+
+app.delete('/api/expenses/:id', requireSupabaseUser, async (req, res) => {
+  const userId = (res.locals.authenticatedUser as AuthenticatedUser).id;
+  const id = Number(req.params.id);
+  try {
+    const r = await pool.query(
+      `DELETE FROM public.expense_entries WHERE id=$1 AND created_by=$2`,
+      [id, userId],
+    );
+    if (!r.rowCount) { res.status(404).json({ error: 'Expense not found.' }); return; }
+    res.json({ success: true });
+  } catch (e) {
+    console.error('expenses DELETE failed:', e);
+    res.status(500).json({ error: 'Unable to delete expense.' });
+  }
+});
+
+// -----------------------------------------------------------------------------
 // Start server and handle shutdown
 // -----------------------------------------------------------------------------
 

@@ -34,6 +34,10 @@ const migrations = [
     version: '007_purchase_module',
     file: '../sql/migrations/007_purchase_module.sql',
   },
+  {
+    version: '008_expenses_module',
+    file: '../sql/migrations/008_expenses_module.sql',
+  },
 ];
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));

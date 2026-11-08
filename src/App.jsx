@@ -16,9 +16,11 @@ const Purchase          = lazy(() => import("./pages/Purchase"));
 const PurchaseDashboard = lazy(() => import("./pages/PurchaseDashboard"));
 const PurchaseOperations= lazy(() => import("./pages/PurchaseOperations"));
 const Vendors           = lazy(() => import("./pages/Vendors"));
-const Reports           = lazy(() => import("./pages/Reports"));
-const DocumentPage      = lazy(() => import("./pages/DocumentPage"));
-const Login             = lazy(() => import("./pages/Login"));
+const Reports             = lazy(() => import("./pages/Reports"));
+const DocumentPage        = lazy(() => import("./pages/DocumentPage"));
+const Expenses            = lazy(() => import("./pages/Expenses"));
+const ExpenseCategories   = lazy(() => import("./pages/ExpenseCategories"));
+const Login               = lazy(() => import("./pages/Login"));
 
 export default function App() {
   return (
@@ -57,6 +59,9 @@ export default function App() {
                 <Route path="/purchase/orders"            element={<Purchase activePage="Purchase Order" />} />
                 <Route path="/purchase/debit-notes" element={<PurchaseOperations activePage="Debit Notes" />} />
                 <Route path="/purchase/vendors"   element={<Vendors activePage="Vendor List" />} />
+
+                <Route path="/expenses"            element={<Expenses activePage="Expenses" />} />
+                <Route path="/expenses/categories" element={<ExpenseCategories activePage="Expense Categories" />} />
 
                 <Route path="/reports/profit-loss"   element={<Reports activePage="Profit & Loss" />} />
                 <Route path="/reports/balance-sheet" element={<Reports activePage="Balance Sheet" />} />

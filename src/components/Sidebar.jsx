@@ -26,6 +26,8 @@ const ICON_PATHS = {
   balance: <><path d="M4 4h16v16H4z" /><path d="M8 8h8M8 12h8M8 16h4" /></>,
   cashflow: <><path d="M4 7h16M4 17h16" /><path d="m8 4-4 3 4 3M16 14l4 3-4 3" /></>,
   banking: <><path d="m3 9 9-6 9 6" /><path d="M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18" /></>,
+  expenses: <><path d="M3 6h18v14H3z" /><path d="M3 10h18M7 6V4h10v2" /><path d="M9 15h2M13 15h2M9 13h6" /></>,
+  expenseCategory: <><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12h6M9 16h4" /></>,
   tds: <><path d="M4 3h16v18H4z" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
   gst: <><path d="M4 3h16v18H4z" /><path d="M8 8h8M8 12h8M8 16h4" /></>,
   filing: <><path d="M6 2h9l5 5v15H6z" /><path d="M15 2v6h5M9 13l2 2 4-4" /></>,
@@ -108,6 +110,14 @@ const NAV_GROUPS = [
       { label: "Purchase Order",     icon: "purchaseOrder",     path: "/purchase/orders" },
       { label: "Debit Notes",        icon: "debitNote",         path: "/purchase/debit-notes" },
       { label: "Vendor List",        icon: "vendor",            path: "/purchase/vendors" },
+    ],
+  },
+  {
+    title: "Expenses",
+    icon: "expenses",
+    items: [
+      { label: "Expense Entries",    icon: "expenses",         path: "/expenses" },
+      { label: "Expense Categories", icon: "expenseCategory",  path: "/expenses/categories" },
     ],
   },
   {
