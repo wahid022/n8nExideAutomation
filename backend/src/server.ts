@@ -1651,6 +1651,7 @@ app.get('/api/reports/profit-loss', requireSupabaseUser, async (req, res) => {
   const from = typeof req.query.from === 'string' ? req.query.from : `${fyYear}-04-01`;
   const to   = typeof req.query.to   === 'string' ? req.query.to   : now.toISOString().slice(0, 10);
   try {
+    // Core revenue / COGS queries
     const [rev, cogs, cn, dn, revByGstRes, cogsByGstRes, monthlyRev, monthlyCogs] = await Promise.all([
       pool.query(`SELECT COALESCE(SUM(taxable_value),0)::numeric AS total FROM public.sales_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void')`, [from, to]),
       pool.query(`SELECT COALESCE(SUM(taxable_value),0)::numeric AS total FROM public.purchase_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void')`, [from, to]),
@@ -1660,9 +1661,9 @@ app.get('/api/reports/profit-loss', requireSupabaseUser, async (req, res) => {
         SELECT gst_rate, SUM(taxable)::numeric AS taxable, SUM(tax_amt)::numeric AS tax_amt
         FROM (
           SELECT
-            COALESCE((item->>'gstRate')::numeric, (item->>'taxPercent')::numeric, 0) AS gst_rate,
-            COALESCE((item->>'taxableValue')::numeric, (item->>'unitPrice')::numeric * COALESCE((item->>'quantity')::numeric,1), 0) AS taxable,
-            COALESCE((item->>'taxAmt')::numeric, 0) AS tax_amt
+            COALESCE((item->>'gstRate')::numeric,(item->>'taxPercent')::numeric,0) AS gst_rate,
+            COALESCE((item->>'taxableValue')::numeric,(item->>'unitPrice')::numeric*COALESCE((item->>'quantity')::numeric,1),0) AS taxable,
+            COALESCE((item->>'taxAmt')::numeric,0) AS tax_amt
           FROM public.sales_invoices si, jsonb_array_elements(si.items) AS item
           WHERE si.invoice_date BETWEEN $1 AND $2 AND si.status NOT IN ('Draft','Void')
         ) t GROUP BY gst_rate ORDER BY gst_rate
@@ -1671,9 +1672,9 @@ app.get('/api/reports/profit-loss', requireSupabaseUser, async (req, res) => {
         SELECT gst_rate, SUM(taxable)::numeric AS taxable, SUM(tax_amt)::numeric AS tax_amt
         FROM (
           SELECT
-            COALESCE((item->>'gstRate')::numeric, (item->>'taxPercent')::numeric, 0) AS gst_rate,
-            COALESCE((item->>'taxableValue')::numeric, (item->>'unitPrice')::numeric * COALESCE((item->>'quantity')::numeric,1), 0) AS taxable,
-            COALESCE((item->>'taxAmt')::numeric, 0) AS tax_amt
+            COALESCE((item->>'gstRate')::numeric,(item->>'taxPercent')::numeric,0) AS gst_rate,
+            COALESCE((item->>'taxableValue')::numeric,(item->>'unitPrice')::numeric*COALESCE((item->>'quantity')::numeric,1),0) AS taxable,
+            COALESCE((item->>'taxAmt')::numeric,0) AS tax_amt
           FROM public.purchase_invoices pi, jsonb_array_elements(pi.items) AS item
           WHERE pi.invoice_date BETWEEN $1 AND $2 AND pi.status NOT IN ('Draft','Void')
         ) t GROUP BY gst_rate ORDER BY gst_rate
@@ -1681,37 +1682,119 @@ app.get('/api/reports/profit-loss', requireSupabaseUser, async (req, res) => {
       pool.query(`SELECT TO_CHAR(DATE_TRUNC('month',invoice_date),'YYYY-MM') AS month, COALESCE(SUM(taxable_value),0)::numeric AS revenue FROM public.sales_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void') GROUP BY DATE_TRUNC('month',invoice_date) ORDER BY DATE_TRUNC('month',invoice_date)`, [from, to]),
       pool.query(`SELECT TO_CHAR(DATE_TRUNC('month',invoice_date),'YYYY-MM') AS month, COALESCE(SUM(taxable_value),0)::numeric AS cogs FROM public.purchase_invoices WHERE invoice_date BETWEEN $1 AND $2 AND status NOT IN ('Draft','Void') GROUP BY DATE_TRUNC('month',invoice_date) ORDER BY DATE_TRUNC('month',invoice_date)`, [from, to]),
     ]);
-    const revenue = Number(rev.rows[0].total);
+
+    // Expense queries — isolated try/catch so a missing table never breaks the P&L
+    type ExpCat = { name: string; total: number };
+    type MonthExp = { month: string; direct: number; indirect: number };
+    let directByCategory: ExpCat[]   = [];
+    let indirectByCategory: ExpCat[] = [];
+    let monthlyExpenses: MonthExp[]  = [];
+    try {
+      const [directRes, indirectRes, monthlyExpRes] = await Promise.all([
+        pool.query(`
+          SELECT c.name, COALESCE(SUM(e.amount),0)::numeric AS total
+          FROM public.expense_entries e
+          JOIN public.expense_categories c ON c.id = e.category_id
+          WHERE e.expense_date BETWEEN $1 AND $2 AND c.type = 'Direct'
+          GROUP BY c.name ORDER BY total DESC
+        `, [from, to]),
+        pool.query(`
+          SELECT c.name, COALESCE(SUM(e.amount),0)::numeric AS total
+          FROM public.expense_entries e
+          JOIN public.expense_categories c ON c.id = e.category_id
+          WHERE e.expense_date BETWEEN $1 AND $2 AND c.type = 'Indirect'
+          GROUP BY c.name ORDER BY total DESC
+        `, [from, to]),
+        pool.query(`
+          SELECT
+            TO_CHAR(DATE_TRUNC('month', e.expense_date), 'YYYY-MM') AS month,
+            COALESCE(SUM(CASE WHEN c.type='Direct'   THEN e.amount ELSE 0 END),0)::numeric AS direct,
+            COALESCE(SUM(CASE WHEN c.type='Indirect' THEN e.amount ELSE 0 END),0)::numeric AS indirect
+          FROM public.expense_entries e
+          JOIN public.expense_categories c ON c.id = e.category_id
+          WHERE e.expense_date BETWEEN $1 AND $2
+          GROUP BY DATE_TRUNC('month', e.expense_date)
+          ORDER BY DATE_TRUNC('month', e.expense_date)
+        `, [from, to]),
+      ]);
+      directByCategory   = directRes.rows.map((r: { name: string; total: string }) => ({ name: r.name, total: Number(r.total) }));
+      indirectByCategory = indirectRes.rows.map((r: { name: string; total: string }) => ({ name: r.name, total: Number(r.total) }));
+      monthlyExpenses    = monthlyExpRes.rows.map((r: { month: string; direct: string; indirect: string }) => ({ month: r.month, direct: Number(r.direct), indirect: Number(r.indirect) }));
+    } catch (expErr) {
+      console.warn('Expense data unavailable for P&L (migration may be pending):', expErr instanceof Error ? expErr.message : expErr);
+    }
+
+    // ── Calculations ──────────────────────────────────────────────────────────
+    const revenue          = Number(rev.rows[0].total);
     const creditDeductions = Number(cn.rows[0].total);
-    const netRevenue = revenue - creditDeductions;
-    const totalCogs = Number(cogs.rows[0].total);
-    const debitCredits = Number(dn.rows[0].total);
-    const netCogs = totalCogs - debitCredits;
-    const grossProfit = netRevenue - netCogs;
-    const grossMargin = netRevenue > 0 ? Math.round((grossProfit / netRevenue) * 1000) / 10 : 0;
-    const revenueByGst = revByGstRes.rows.map(r => ({
-      rate: Number(r.gst_rate),
-      taxable: Number(r.taxable),
-      taxAmt: Number(r.tax_amt),
+    const netRevenue       = revenue - creditDeductions;
+    const totalCogs        = Number(cogs.rows[0].total);
+    const debitCredits     = Number(dn.rows[0].total);
+    const netCogs          = totalCogs - debitCredits;
+
+    const directExpenses   = directByCategory.reduce((s, r) => s + r.total, 0);
+    const indirectExpenses = indirectByCategory.reduce((s, r) => s + r.total, 0);
+    const totalExpenses    = directExpenses + indirectExpenses;
+
+    // Two-stage P&L
+    const grossProfit  = netRevenue - netCogs - directExpenses;   // Trading Account result
+    const netProfit    = grossProfit - indirectExpenses;           // P&L Account result
+
+    const grossMargin  = netRevenue > 0 ? Math.round((grossProfit / netRevenue) * 1000) / 10 : 0;
+    const netMargin    = netRevenue > 0 ? Math.round((netProfit  / netRevenue) * 1000) / 10 : 0;
+
+    const revenueByGst = revByGstRes.rows.map((r: { gst_rate: string; taxable: string; tax_amt: string }) => ({
+      rate: Number(r.gst_rate), taxable: Number(r.taxable), taxAmt: Number(r.tax_amt),
       label: Number(r.gst_rate) === 0 ? 'Sales @0% (Non-GST)' : `Sales @${Number(r.gst_rate)}%`,
     }));
-    const cogsByGst = cogsByGstRes.rows.map(r => ({
-      rate: Number(r.gst_rate),
-      taxable: Number(r.taxable),
-      taxAmt: Number(r.tax_amt),
+    const cogsByGst = cogsByGstRes.rows.map((r: { gst_rate: string; taxable: string; tax_amt: string }) => ({
+      rate: Number(r.gst_rate), taxable: Number(r.taxable), taxAmt: Number(r.tax_amt),
       label: Number(r.gst_rate) === 0 ? 'Purchase @0% (Non-GST)' : `Purchase @${Number(r.gst_rate)}%`,
     }));
-    const monthMap: Record<string, { revenue: number; cogs: number }> = {};
-    for (const r of monthlyRev.rows) monthMap[r.month] = { revenue: Number(r.revenue), cogs: 0 };
-    for (const r of monthlyCogs.rows) { if (!monthMap[r.month]) monthMap[r.month] = { revenue: 0, cogs: 0 }; monthMap[r.month].cogs = Number(r.cogs); }
-    const monthly = Object.entries(monthMap).sort(([a],[b]) => a.localeCompare(b)).map(([month, v]) => ({ month, revenue: v.revenue, cogs: v.cogs, profit: v.revenue - v.cogs }));
-    res.json({ period: { from, to }, revenue, creditDeductions, netRevenue, totalCogs, debitCredits, netCogs, grossProfit, grossMargin, revenueByGst, cogsByGst, monthly });
+
+    // Monthly merge — revenue + COGS + expenses into one timeline
+    const monthMap: Record<string, { revenue: number; cogs: number; direct: number; indirect: number }> = {};
+    for (const r of monthlyRev.rows)   { monthMap[r.month] = { revenue: Number(r.revenue), cogs: 0, direct: 0, indirect: 0 }; }
+    for (const r of monthlyCogs.rows)  { if (!monthMap[r.month]) monthMap[r.month] = { revenue: 0, cogs: 0, direct: 0, indirect: 0 }; monthMap[r.month].cogs     = Number(r.cogs); }
+    for (const r of monthlyExpenses)   { if (!monthMap[r.month]) monthMap[r.month] = { revenue: 0, cogs: 0, direct: 0, indirect: 0 }; monthMap[r.month].direct   = r.direct; monthMap[r.month].indirect = r.indirect; }
+    const monthly = Object.entries(monthMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, v]) => ({
+        month,
+        revenue:    v.revenue,
+        cogs:       v.cogs,
+        direct:     v.direct,
+        indirect:   v.indirect,
+        totalCost:  v.cogs + v.direct + v.indirect,
+        grossProfit: v.revenue - v.cogs - v.direct,
+        netProfit:  v.revenue - v.cogs - v.direct - v.indirect,
+      }));
+
+    res.json({
+      period: { from, to },
+      revenue, creditDeductions, netRevenue,
+      totalCogs, debitCredits, netCogs,
+      directExpenses, directByCategory,
+      indirectExpenses, indirectByCategory,
+      totalExpenses,
+      grossProfit, grossMargin,
+      netProfit,   netMargin,
+      revenueByGst, cogsByGst,
+      monthly,
+    });
   } catch (e) { console.error('P&L report failed:', e); res.status(500).json({ error: 'Unable to generate P&L report.' }); }
 });
 
 // Reports: Balance Sheet
 app.get('/api/reports/balance-sheet', requireSupabaseUser, async (_req, res) => {
   try {
+    // plExpRow fetched separately — isolated so a missing expenses table never breaks the balance sheet
+    let totalExpensesForBS = 0;
+    try {
+      const expRow = await pool.query(`SELECT COALESCE(SUM(amount),0)::numeric AS total FROM public.expense_entries`);
+      totalExpensesForBS = Number(expRow.rows[0].total);
+    } catch (_e) { /* expense_entries table may not exist yet */ }
+
     const [arRows, cashTotal, apRows, outputGst, inputGst, plRevRow, plCogsRow, plCnRow, plDnRow] = await Promise.all([
       pool.query(`
         SELECT
@@ -1758,8 +1841,10 @@ app.get('/api/reports/balance-sheet', requireSupabaseUser, async (_req, res) => 
     const outputGstTotal = Number(outputGst.rows[0].total);
     const inputGstTotal = Number(inputGst.rows[0].total);
     const netGstPayable = outputGstTotal - inputGstTotal;
-    // P&L profit: use taxable_value (strips GST) — avoids inflated residual from mixing grand totals with net GST liability
-    const plProfit = (Number(plRevRow.rows[0].total) - Number(plCnRow.rows[0].total)) - (Number(plCogsRow.rows[0].total) - Number(plDnRow.rows[0].total));
+    // Net profit: taxable_value basis (strips GST) minus all expenses
+    const plProfit = (Number(plRevRow.rows[0].total) - Number(plCnRow.rows[0].total))
+                   - (Number(plCogsRow.rows[0].total) - Number(plDnRow.rows[0].total))
+                   - totalExpensesForBS;
     const totalLiabilities = accountsPayable + Math.max(0, netGstPayable) + plProfit;
 
     const arByCust: Record<string, { name: string; total: number; invoices: any[] }> = {};

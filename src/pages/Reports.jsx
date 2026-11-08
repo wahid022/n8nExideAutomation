@@ -147,46 +147,137 @@ function ProfitLoss({ from, to }) {
   if (error) return <ErrorMsg msg={error.message} />;
   if (!data) return null;
 
-  const { netRevenue, netCogs, grossProfit, grossMargin, revenue, creditDeductions, totalCogs, debitCredits, monthly, revenueByGst = [], cogsByGst = [] } = data;
+  const {
+    revenue, creditDeductions, netRevenue,
+    totalCogs, debitCredits, netCogs,
+    directExpenses = 0, directByCategory = [],
+    indirectExpenses = 0, indirectByCategory = [],
+    totalExpenses = 0,
+    grossProfit, grossMargin,
+    netProfit = grossProfit, netMargin = grossMargin,
+    monthly, revenueByGst = [], cogsByGst = [],
+  } = data;
 
+  const grossLoss = grossProfit < 0 ? Math.abs(grossProfit) : 0;
+  const netLoss   = netProfit   < 0 ? Math.abs(netProfit)   : 0;
+
+  // Trading Account - Dr (left)
   const drRows = [];
-  drRows.push({ label: "Purchase Accounts", type: "section" });
+  drRows.push({ label: "TRADING ACCOUNT", type: "section" });
+  drRows.push({ label: "Purchase Accounts", type: "subsection" });
   if (cogsByGst.length > 0) {
     for (const g of cogsByGst) drRows.push({ label: g.label, sub: g.taxable, indent: 1 });
   } else {
-    drRows.push({ label: "Purchase Invoices (Received)", sub: totalCogs, indent: 1 });
+    drRows.push({ label: "Purchase Invoices", sub: totalCogs, indent: 1 });
   }
   if (debitCredits > 0) drRows.push({ label: "Less: Debit Notes", sub: -debitCredits, indent: 1 });
-  drRows.push({ label: " ", total: netCogs });
+  drRows.push({ label: "Net Purchases", total: netCogs });
   drRows.push({ type: "empty" });
-  drRows.push({ label: "Gross Profit  c/o", total: grossProfit >= 0 ? grossProfit : 0 });
+
+  drRows.push({ label: "Direct Expenses", type: "subsection" });
+  if (directByCategory.length > 0) {
+    for (const c of directByCategory) drRows.push({ label: c.name, sub: c.total, indent: 1 });
+  } else {
+    drRows.push({ label: "No direct expenses recorded", sub: 0, indent: 1 });
+  }
+  drRows.push({ label: "Total Direct Expenses", total: directExpenses });
+  drRows.push({ type: "empty" });
+
+  if (grossProfit >= 0) drRows.push({ label: "Gross Profit  c/f", total: grossProfit, type: "grand" });
+  if (grossLoss   >  0) drRows.push({ label: "Gross Loss  c/f",   total: grossLoss,   type: "grand" });
   drRows.push({ type: "divider" });
   drRows.push({ label: "Total", total: netRevenue, type: "total" });
   drRows.push({ type: "divider" });
-  drRows.push({ label: "Net Profit", total: grossProfit, type: "grand" });
-  drRows.push({ label: `Gross Margin: ${grossMargin}%`, type: "note" });
 
+  // P&L Account - Dr (left)
+  drRows.push({ label: "P&L ACCOUNT", type: "section" });
+  drRows.push({ label: "Indirect Expenses", type: "subsection" });
+  if (indirectByCategory.length > 0) {
+    for (const c of indirectByCategory) drRows.push({ label: c.name, sub: c.total, indent: 1 });
+  } else {
+    drRows.push({ label: "No indirect expenses recorded", sub: 0, indent: 1 });
+  }
+  drRows.push({ label: "Total Indirect Expenses", total: indirectExpenses });
+  drRows.push({ type: "empty" });
+
+  if (netProfit >= 0) drRows.push({ label: "Net Profit",    total: netProfit, type: "grand" });
+  if (netLoss   >  0) drRows.push({ label: "Net Loss  c/f", total: netLoss,   type: "grand" });
+  drRows.push({ type: "divider" });
+  const plDrTotal = grossProfit >= 0 ? grossProfit : indirectExpenses;
+  drRows.push({ label: "Total", total: plDrTotal, type: "total" });
+  drRows.push({ type: "divider" });
+  drRows.push({ label: `Net Margin: ${netMargin}%`, type: "note" });
+
+  // Trading Account - Cr (right)
   const crRows = [];
-  crRows.push({ label: "Sales Accounts", type: "section" });
+  crRows.push({ label: "TRADING ACCOUNT", type: "section" });
+  crRows.push({ label: "Sales Accounts", type: "subsection" });
   if (revenueByGst.length > 0) {
     for (const g of revenueByGst) crRows.push({ label: g.label, sub: g.taxable, indent: 1 });
   } else {
     crRows.push({ label: "Gross Sales (Invoices)", sub: revenue, indent: 1 });
   }
   if (creditDeductions > 0) crRows.push({ label: "Less: Credit Notes", sub: -creditDeductions, indent: 1 });
-  crRows.push({ label: " ", total: netRevenue });
+  crRows.push({ label: "Net Sales", total: netRevenue });
   crRows.push({ type: "empty" });
+
+  if (grossLoss > 0) crRows.push({ label: "Gross Loss  c/f", total: grossLoss, type: "grand" });
+  else               crRows.push({ type: "empty" });
   crRows.push({ type: "empty" });
   crRows.push({ type: "divider" });
   crRows.push({ label: "Total", total: netRevenue, type: "total" });
   crRows.push({ type: "divider" });
-  crRows.push({ label: "Gross Profit  b/f", total: grossProfit >= 0 ? grossProfit : 0, type: "grand" });
-  crRows.push({ label: "Indirect Expenses: —", type: "note" });
+
+  // P&L Account - Cr (right)
+  crRows.push({ label: "P&L ACCOUNT", type: "section" });
+  if (grossProfit >= 0) crRows.push({ label: "Gross Profit  b/f", total: grossProfit, type: "grand" });
+  if (grossLoss   >  0) crRows.push({ label: "Gross Loss  b/f",  total: grossLoss,   type: "grand" });
+  crRows.push({ type: "empty" });
+  crRows.push({ type: "empty" });
+  if (netLoss > 0) crRows.push({ label: "Net Loss  b/f", total: netLoss, type: "grand" });
+  else             crRows.push({ type: "empty" });
+  crRows.push({ type: "empty" });
+  crRows.push({ type: "divider" });
+  crRows.push({ label: "Total", total: plDrTotal, type: "total" });
+  crRows.push({ type: "divider" });
+  crRows.push({ label: `Gross Margin: ${grossMargin}%`, type: "note" });
 
   return (
     <div className="rpt-section">
+      {/* KPI summary strip */}
+      <div className="sd-kpi-row rpt-no-print" style={{ marginBottom: 18 }}>
+        <KpiCard
+          label="Net Revenue"
+          value={money(netRevenue)}
+          sub={creditDeductions > 0 ? `After credit notes ${money(creditDeductions)}` : "Gross sales net of returns"}
+          accent="blue"
+          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>}
+        />
+        <KpiCard
+          label={grossProfit >= 0 ? "Gross Profit" : "Gross Loss"}
+          value={money(Math.abs(grossProfit))}
+          sub={`Margin ${grossMargin}% after purchases & direct exp.`}
+          accent={grossProfit >= 0 ? "green" : "red"}
+          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>}
+        />
+        <KpiCard
+          label="Total Expenses"
+          value={money(totalExpenses)}
+          sub={`Direct ${money(directExpenses)} | Indirect ${money(indirectExpenses)}`}
+          accent="indigo"
+          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2"/></svg>}
+        />
+        <KpiCard
+          label={netProfit >= 0 ? "Net Profit" : "Net Loss"}
+          value={money(Math.abs(netProfit))}
+          sub={`Net margin ${netMargin}% after all expenses`}
+          accent={netProfit >= 0 ? "green" : "red"}
+          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 3v18h18"/><path d="M7 16l5-5 4 4 5-5"/></svg>}
+        />
+      </div>
+
       <div className="rpt-report-actions">
-        <div className="rpt-period-label">Period: {fmtDate(from)} — {fmtDate(to)}</div>
+        <div className="rpt-period-label">Period: {fmtDate(from)} \u2014 {fmtDate(to)}</div>
         <button className="rpt-print-btn" onClick={() => window.print()}>
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           Print / Export PDF
@@ -197,24 +288,27 @@ function ProfitLoss({ from, to }) {
         <div className="rpt-print-title">Profit &amp; Loss Account</div>
         <div className="rpt-print-period">{fmtDate(from)} to {fmtDate(to)}</div>
       </div>
+
       <TallyLedger leftRows={drRows} rightRows={crRows} />
+
       {monthly.length > 0 && (
         <div className="sd-card rpt-no-print">
           <div className="sd-card-header">
-            <h2>Monthly Revenue vs Cost</h2>
+            <h2>Monthly Revenue vs Total Cost</h2>
             <div className="rpt-legend">
               <span className="rpt-legend-dot" style={{ background: "#4f46e5" }} />Revenue
-              <span className="rpt-legend-dot" style={{ background: "#ef4444", marginLeft: 12 }} />COGS
+              <span className="rpt-legend-dot" style={{ background: "#ef4444", marginLeft: 12 }} />Total Cost (COGS + Expenses)
             </div>
           </div>
           <div style={{ padding: "16px 20px 12px" }}>
-            <BarChart data={monthly} bar1Key="revenue" bar2Key="cogs" bar1Color="#4f46e5" bar2Color="#ef4444" />
+            <BarChart data={monthly} bar1Key="revenue" bar2Key="totalCost" bar1Color="#4f46e5" bar2Color="#ef4444" />
           </div>
         </div>
       )}
     </div>
   );
 }
+
 
 function BalanceSheet() {
   const { data, isLoading, error } = useQuery({
